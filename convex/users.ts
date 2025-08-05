@@ -58,6 +58,8 @@ export const upsertUser = mutation({
       name: identity.name,
       email: identity.email,
       tokenIdentifier: identity.subject,
+      role: "customer", // Default role - can be changed later
+      createdAt: Date.now(),
     });
 
     return await ctx.db.get(userId);
