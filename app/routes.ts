@@ -17,4 +17,12 @@ export default [
     route("dashboard/chat", "routes/dashboard/chat.tsx"),
     route("dashboard/settings", "routes/dashboard/settings.tsx"),
   ]),
+  // Forwarder dashboard
+  layout("routes/forwarder/layout.tsx", [
+    route("forwarder", "routes/forwarder/index.tsx"),
+    route("forwarder/orders", "routes/forwarder/orders.tsx"),
+    route("forwarder/warehouses", "routes/forwarder/warehouses.tsx"),
+    route("forwarder/analytics", "routes/forwarder/analytics.tsx"),
+    route("forwarder/settings", "routes/forwarder/settings.tsx"),
+  ]),
 ] satisfies RouteConfig;
