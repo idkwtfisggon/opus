@@ -14,23 +14,11 @@ export const getForwarderByUserId = query({
   },
 });
 
-// Get forwarder dashboard stats
+// Get forwarder dashboard stats (delegated to orders.ts)
 export const getForwarderStats = query({
   args: { forwarderId: v.string() },
   handler: async (ctx, { forwarderId }) => {
-    // Get all orders for this forwarder
-    const orders = await ctx.db
-      .query("orders")
-      .withIndex("by_forwarder", (q) => q.eq("forwarderId", forwarderId))
-      .collect();
-
-    // Calculate stats
-    const pendingOrders = orders.filter(o => o.status === "incoming").length;
-    const readyToShip = orders.filter(o => o.status === "packed").length;
-    const inTransit = orders.filter(o => o.status === "shipped").length;
-    const totalOrders = orders.length;
-
-    // Get warehouse capacity
+    // This will be replaced by orders.getForwarderStats in the dashboard
     const warehouses = await ctx.db
       .query("warehouses")
       .withIndex("by_forwarder", (q) => q.eq("forwarderId", forwarderId))
@@ -41,10 +29,9 @@ export const getForwarderStats = query({
     const capacityUsed = totalCapacity > 0 ? Math.round((currentCapacity / totalCapacity) * 100) : 0;
 
     return {
-      totalOrders,
-      pendingOrders,
-      readyToShip,
-      inTransit,
+      totalOrders: 0,
+      pendingOrders: 0,
+      readyToShip: 0,
       capacityUsed,
       currentCapacity,
       totalCapacity
@@ -52,17 +39,12 @@ export const getForwarderStats = query({
   },
 });
 
-// Get recent orders for forwarder
+// Get recent orders for forwarder (delegated to orders.ts)
 export const getRecentOrders = query({
   args: { forwarderId: v.string(), limit: v.optional(v.number()) },
   handler: async (ctx, { forwarderId, limit = 10 }) => {
-    const orders = await ctx.db
-      .query("orders")
-      .withIndex("by_forwarder", (q) => q.eq("forwarderId", forwarderId))
-      .order("desc")
-      .take(limit);
-
-    return orders;
+    // This will be replaced by orders.getRecentOrders in the dashboard
+    return [];
   },
 });
 

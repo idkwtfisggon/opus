@@ -100,18 +100,12 @@ export default function ForwarderOnboarding({ userId, onComplete }: ForwarderOnb
   };
 
   const handleSubmit = async () => {
-    console.log("handleSubmit called");
-    console.log("userId:", userId);
-    console.log("formData:", formData);
-    
     if (!userId) {
-      console.log("No user ID found, returning");
       return;
     }
     
     setLoading(true);
     try {
-      console.log("Creating forwarder profile...");
       // Create forwarder profile
       const forwarderId = await createForwarder({
         userId: userId,
@@ -119,9 +113,7 @@ export default function ForwarderOnboarding({ userId, onComplete }: ForwarderOnb
         contactEmail: formData.contactEmail,
         contactPhone: formData.contactPhone || undefined,
       });
-      console.log("Forwarder created with ID:", forwarderId);
 
-      console.log("Creating warehouse...");
       // Create initial warehouse
       await createWarehouse({
         forwarderId: forwarderId as string,
@@ -135,9 +127,7 @@ export default function ForwarderOnboarding({ userId, onComplete }: ForwarderOnb
         maxWeightKg: formData.maxWeightKg,
         maxDimensionsCm: "100 x 100 x 100", // Default dimensions
       });
-      console.log("Warehouse created successfully");
 
-      console.log("Calling onComplete...");
       onComplete();
     } catch (error) {
       console.error("Error creating forwarder profile:", error);
@@ -150,7 +140,7 @@ export default function ForwarderOnboarding({ userId, onComplete }: ForwarderOnb
   const isCurrentStep = (step: number) => step === currentStep;
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-background flex items-center justify-center p-6">
       <div className="max-w-2xl w-full">
         {/* Progress Steps */}
         <div className="mb-8">
@@ -159,12 +149,12 @@ export default function ForwarderOnboarding({ userId, onComplete }: ForwarderOnb
               const Icon = step.icon;
               return (
                 <div key={step.id} className="flex flex-col items-center flex-1">
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-2 ${
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 transition-all duration-200 ${
                     isStepComplete(step.id) 
-                      ? 'bg-green-600 text-white'
+                      ? 'bg-primary text-primary-foreground shadow-sm'
                       : isCurrentStep(step.id)
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-200 text-gray-400'
+                      ? 'bg-primary text-primary-foreground shadow-sm'
+                      : 'bg-muted text-muted-foreground'
                   }`}>
                     {isStepComplete(step.id) ? (
                       <CheckCircle className="h-6 w-6" />
@@ -174,12 +164,12 @@ export default function ForwarderOnboarding({ userId, onComplete }: ForwarderOnb
                   </div>
                   <div className="text-center">
                     <p className={`text-sm font-medium ${
-                      isCurrentStep(step.id) ? 'text-blue-600' : 
-                      isStepComplete(step.id) ? 'text-green-600' : 'text-gray-400'
+                      isCurrentStep(step.id) ? 'text-primary' : 
+                      isStepComplete(step.id) ? 'text-primary' : 'text-muted-foreground'
                     }`}>
                       {step.title}
                     </p>
-                    <p className="text-xs text-gray-500 mt-1">{step.description}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{step.description}</p>
                   </div>
                 </div>
               );
@@ -187,25 +177,25 @@ export default function ForwarderOnboarding({ userId, onComplete }: ForwarderOnb
           </div>
           
           {/* Progress Bar */}
-          <div className="mt-4 bg-gray-200 rounded-full h-2">
+          <div className="mt-6 bg-muted rounded-full h-2">
             <div 
-              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+              className="bg-primary h-2 rounded-full transition-all duration-300"
               style={{ width: `${((currentStep - 1) / (STEPS.length - 1)) * 100}%` }}
             />
           </div>
         </div>
 
         {/* Form Content */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+        <Card className="border-border shadow-lg">
+          <CardHeader className="pb-6">
+            <CardTitle className="flex items-center gap-3 text-foreground">
               {(() => {
                 const Icon = STEPS[currentStep - 1].icon;
-                return <Icon className="h-5 w-5" />;
+                return <Icon className="h-5 w-5 text-primary" />;
               })()}
               {STEPS[currentStep - 1].title}
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-muted-foreground">
               {STEPS[currentStep - 1].description}
             </CardDescription>
           </CardHeader>
@@ -225,9 +215,9 @@ export default function ForwarderOnboarding({ userId, onComplete }: ForwarderOnb
                   />
                 </div>
                 
-                <div className="bg-blue-50 p-4 rounded-lg">
-                  <h4 className="font-medium text-blue-900 mb-2">What you'll get:</h4>
-                  <ul className="text-sm text-blue-800 space-y-1">
+                <div className="bg-primary/5 border border-primary/20 p-4 rounded-lg">
+                  <h4 className="font-medium text-foreground mb-2">What you'll get:</h4>
+                  <ul className="text-sm text-muted-foreground space-y-1">
                     <li>• Professional dashboard to manage orders</li>
                     <li>• Automated label printing system</li>
                     <li>• Real-time order tracking</li>
@@ -261,7 +251,7 @@ export default function ForwarderOnboarding({ userId, onComplete }: ForwarderOnb
                     onChange={(e) => updateFormData('contactPhone', e.target.value)}
                     className="mt-1"
                   />
-                  <p className="text-sm text-gray-500 mt-1">Optional - for customer support</p>
+                  <p className="text-sm text-muted-foreground mt-1">Optional - for customer support</p>
                 </div>
               </div>
             )}
@@ -346,7 +336,7 @@ export default function ForwarderOnboarding({ userId, onComplete }: ForwarderOnb
                       onChange={(e) => updateFormData('maxParcels', parseInt(e.target.value) || 0)}
                       className="mt-1"
                     />
-                    <p className="text-sm text-gray-500 mt-1">Total packages you can handle</p>
+                    <p className="text-sm text-muted-foreground mt-1">Total packages you can handle</p>
                   </div>
                   <div>
                     <Label htmlFor="maxWeightKg">Max Weight per Package (kg)</Label>
@@ -363,7 +353,7 @@ export default function ForwarderOnboarding({ userId, onComplete }: ForwarderOnb
             )}
 
             {/* Navigation Buttons */}
-            <div className="flex justify-between pt-6 border-t">
+            <div className="flex justify-between pt-6 border-t border-border">
               <Button
                 type="button"
                 variant="outline"
@@ -377,16 +367,13 @@ export default function ForwarderOnboarding({ userId, onComplete }: ForwarderOnb
 
               {currentStep === 3 ? (
                 <Button
-                  onClick={() => {
-                    console.log("Complete Setup button clicked!");
-                    handleSubmit();
-                  }}
+                  onClick={handleSubmit}
                   disabled={!validateStep(currentStep) || loading}
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-2 shadow-sm"
                 >
                   {loading ? (
                     <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-foreground"></div>
                       Setting up...
                     </>
                   ) : (
@@ -400,7 +387,7 @@ export default function ForwarderOnboarding({ userId, onComplete }: ForwarderOnb
                 <Button
                   onClick={nextStep}
                   disabled={!validateStep(currentStep)}
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-2 shadow-sm"
                 >
                   Next
                   <ArrowRight className="h-4 w-4" />
@@ -411,10 +398,10 @@ export default function ForwarderOnboarding({ userId, onComplete }: ForwarderOnb
         </Card>
 
         {/* Skip Option */}
-        <div className="text-center mt-4">
+        <div className="text-center mt-6">
           <button
             onClick={onComplete}
-            className="text-sm text-gray-500 hover:text-gray-700"
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             Skip for now - I'll set this up later
           </button>
