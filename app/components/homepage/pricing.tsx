@@ -77,7 +77,7 @@ export default function Pricing({ loaderData }: { loaderData: any }) {
           </p>
         </div>
 
-        {!loaderData?.plans ? (
+        {!loaderData?.plans || !loaderData?.plans?.items ? (
           <div className="mt-8 flex items-center justify-center">
             <div className="flex items-center gap-2">
               <Loader2 className="h-4 w-4 animate-spin" />
