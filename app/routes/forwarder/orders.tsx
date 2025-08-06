@@ -238,9 +238,32 @@ export default function ManageOrders({ loaderData }: Route.ComponentProps) {
                       <div className="flex items-center gap-2">
                         {/* Smart Actions based on order state - Customer pre-assigns courier */}
                         {order.status === 'arrived_at_warehouse' && order.courier ? (
-                          <button className="bg-primary text-primary-foreground px-3 py-1 rounded-md text-sm font-medium hover:bg-primary/90 transition-colors">
+                          <a
+                            href={`/print-label?trackingNumber=${encodeURIComponent(
+                              order.trackingNumber
+                            )}&recipientName=${encodeURIComponent(
+                              order.customerName
+                            )}&orderId=${encodeURIComponent(
+                              order._id
+                            )}&courier=${encodeURIComponent(
+                              order.courier
+                            )}&weight=${encodeURIComponent(
+                              order.declaredWeight.toString()
+                            )}&createdAt=${encodeURIComponent(
+                              new Date(order.createdAt).toISOString()
+                            )}&merchantName=${encodeURIComponent(
+                              order.merchantName
+                            )}&customerEmail=${encodeURIComponent(
+                              order.customerEmail
+                            )}&shippingType=${encodeURIComponent(
+                              order.shippingType
+                            )}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="bg-primary text-primary-foreground px-3 py-1 rounded-md text-sm font-medium hover:bg-primary/90 transition-colors inline-block"
+                          >
                             Print Label
-                          </button>
+                          </a>
                         ) : order.status === 'arrived_at_warehouse' && !order.courier ? (
                           <span className="text-sm text-red-600">
                             ⚠️ No courier assigned
