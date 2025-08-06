@@ -5,12 +5,14 @@ import { v } from "convex/values";
 export const getOrderVolumeAnalytics = query({
   args: { 
     forwarderId: v.string(),
-    daysBack: v.optional(v.number()) // Default to 30 days
+    daysBack: v.optional(v.number()) // Optional override, defaults to account creation
   },
   handler: async (ctx, args) => {
-    const { forwarderId, daysBack = 30 } = args;
+    const { forwarderId, daysBack } = args;
     const now = Date.now();
-    const startTime = now - (daysBack * 24 * 60 * 60 * 1000);
+    
+    // Use daysBack parameter or default to 30 days
+    const startTime = now - ((daysBack || 30) * 24 * 60 * 60 * 1000);
     
     // Get orders from the last N days
     const orders = await ctx.db
@@ -61,7 +63,9 @@ export const getOrderVolumeAnalytics = query({
 
     // Fill in missing dates with 0 volume (Singapore timezone)
     const filledDailyVolume: Array<{ date: string; count: number; revenue: number }> = [];
-    for (let i = daysBack - 1; i >= 0; i--) {
+    const totalDays = daysBack || 30;
+    
+    for (let i = totalDays - 1; i >= 0; i--) {
       // Generate date in Singapore timezone
       const dayStart = now - (i * 24 * 60 * 60 * 1000);
       const utcDate = new Date(dayStart);
@@ -103,6 +107,7 @@ export const getOrderVolumeAnalytics = query({
       currentMonthOrders,
       lastMonthOrders,
       monthOverMonthGrowth: Math.round(monthOverMonthGrowth * 10) / 10,
+      
       
       // Breakdowns
       courierBreakdown: Object.entries(courierBreakdown)

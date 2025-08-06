@@ -56,13 +56,20 @@ export default function OrderVolumeChart({ forwarderId }: OrderVolumeChartProps)
   }
   
   const maxCount = Math.max(...analytics.dailyVolume.map(d => d.count), 1);
-  const avgCount = analytics.dailyVolume.reduce((sum, d) => sum + d.count, 0) / analytics.dailyVolume.length;
   
-  console.log("Max count:", maxCount, "Avg count:", avgCount);
+  // Calculate average since account setup (total orders / total days)
+  const totalOrders = analytics.dailyVolume.reduce((sum, d) => sum + d.count, 0);
+  const totalDays = analytics.dailyVolume.length;
+  const avgCount = totalDays > 0 ? totalOrders / totalDays : 0;
   
-  // Color coding based on volume relative to average
+  console.log("Max count:", maxCount, "Total orders:", totalOrders, "Total days:", totalDays, "Avg count:", avgCount);
+  console.log("Days with orders:", analytics.dailyVolume.filter(d => d.count > 0).map(d => `${d.date}: ${d.count}`));
+  
+  // Color coding based on volume relative to average (only considering active days)
   const getVolumeColor = (count: number) => {
     if (count === 0) return "bg-gray-200"; // No orders
+    if (avgCount === 0) return "bg-blue-400"; // Fallback if no average
+    
     if (count < avgCount * 0.7) return "bg-red-300"; // 30% below average
     if (count < avgCount * 0.9) return "bg-orange-300"; // 10-30% below average  
     if (count <= avgCount * 1.1) return "bg-blue-400"; // Around average
@@ -72,6 +79,8 @@ export default function OrderVolumeChart({ forwarderId }: OrderVolumeChartProps)
   
   const getVolumeColorHover = (count: number) => {
     if (count === 0) return "bg-gray-300";
+    if (avgCount === 0) return "bg-blue-500"; // Fallback if no average
+    
     if (count < avgCount * 0.7) return "bg-red-400";
     if (count < avgCount * 0.9) return "bg-orange-400";
     if (count <= avgCount * 1.1) return "bg-blue-500";
@@ -102,7 +111,7 @@ export default function OrderVolumeChart({ forwarderId }: OrderVolumeChartProps)
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              {period === "week" ? "7D" : period === "month" ? "30D" : "90D"}
+{period === "week" ? "7D" : period === "month" ? "30D" : "90D"}
             </button>
           ))}
         </div>
@@ -177,61 +186,77 @@ export default function OrderVolumeChart({ forwarderId }: OrderVolumeChartProps)
       </div>
       
       {/* Chart */}
-      <div className="relative">
-        <div className="flex items-end justify-between h-64 gap-1 mb-4">
+      <div className="relative bg-background rounded-lg p-4">
+        <div className="flex items-end gap-1 h-48">
           {analytics.dailyVolume.map((day, index) => {
-            const heightPercentage = (day.count / maxCount) * 100;
+            const heightPercentage = maxCount > 0 ? (day.count / maxCount) * 100 : 0;
             const isHovered = hoveredDay === day.date;
+            
+            // Calculate pixel height (h-48 = 192px)
+            const pixelHeight = day.count > 0 ? Math.max((heightPercentage / 100) * 192, 8) : 4;
+            
+            // Debug individual bars
+            if (day.count > 0) {
+              console.log(`Bar ${day.date}: count=${day.count}, maxCount=${maxCount}, heightPct=${heightPercentage}%, pixelHeight=${pixelHeight}px, color=${getVolumeColor(day.count)}`);
+            }
             
             return (
               <div
                 key={day.date}
-                className="flex-1 flex flex-col items-center group cursor-pointer"
+                className="flex-1 relative group cursor-pointer"
                 onMouseEnter={() => setHoveredDay(day.date)}
                 onMouseLeave={() => setHoveredDay(null)}
               >
-                <div className="relative flex-1 w-full flex items-end">
-                  <div
-                    className={`w-full rounded-t transition-all duration-200 ${
-                      isHovered ? getVolumeColorHover(day.count) : getVolumeColor(day.count)
-                    }`}
-                    style={{ height: `${Math.max(heightPercentage, 8)}%` }}
-                  />
+                <div
+                  className={`w-full transition-all duration-200 ${
+                    day.count > 0 ? 'rounded-t' : 'rounded'
+                  } ${
+                    isHovered ? getVolumeColorHover(day.count) : getVolumeColor(day.count)
+                  }`}
+                  style={{ 
+                    height: `${pixelHeight}px`,
+                  }}
+                />
                   
-                  {/* Hover Tooltip */}
-                  {isHovered && (
-                    <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 bg-popover border border-border rounded-lg shadow-lg p-3 text-sm whitespace-nowrap z-10">
-                      <div className="font-medium text-foreground">
-                        {new Date(day.date).toLocaleDateString(undefined, { 
-                          weekday: 'short', 
-                          month: 'short', 
-                          day: 'numeric' 
-                        })}
-                      </div>
-                      <div className="text-muted-foreground">
-                        <strong>{day.count}</strong> orders
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        Avg: {avgCount.toFixed(1)} orders
-                      </div>
-                      {day.revenue > 0 && (
-                        <div className="text-muted-foreground">
-                          ${day.revenue.toFixed(0)} revenue
-                        </div>
-                      )}
+                {/* Hover Tooltip */}
+                {isHovered && (
+                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 bg-popover border border-border rounded-lg shadow-lg p-3 text-sm whitespace-nowrap z-10">
+                    <div className="font-medium text-foreground">
+                      {new Date(day.date).toLocaleDateString(undefined, { 
+                        weekday: 'short', 
+                        month: 'short', 
+                        day: 'numeric' 
+                      })}
                     </div>
-                  )}
-                </div>
-                
-                {/* Date Labels (show only some to avoid crowding) */}
-                {index % Math.ceil(analytics.dailyVolume.length / 7) === 0 && (
-                  <div className="text-xs text-muted-foreground mt-2 transform -rotate-45 origin-top-left">
-                    {new Date(day.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                    <div className="text-muted-foreground">
+                      <strong>{day.count}</strong> orders
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      Avg: {avgCount.toFixed(1)} orders/day
+                    </div>
+                    {day.revenue > 0 && (
+                      <div className="text-muted-foreground">
+                        ${day.revenue.toFixed(0)} revenue
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
             );
           })}
+        </div>
+        
+        {/* Date Labels */}
+        <div className="flex justify-between mt-2 px-2">
+          {analytics.dailyVolume.map((day, index) => (
+            index % Math.ceil(analytics.dailyVolume.length / 7) === 0 ? (
+              <div key={`label-${day.date}`} className="text-xs text-muted-foreground">
+                {new Date(day.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+              </div>
+            ) : (
+              <div key={`spacer-${index}`} className="text-xs">&nbsp;</div>
+            )
+          ))}
         </div>
       </div>
 
