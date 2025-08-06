@@ -96,6 +96,39 @@ const ALL_COUNTRIES = [
 
 const COURIERS = ["DHL", "UPS", "FedEx", "SF Express", "Aramex", "TNT"];
 
+// Color coding for couriers
+const getCourierColor = (courier: string) => {
+  const colors: Record<string, string> = {
+    "DHL": "bg-yellow-100 text-yellow-800 border-yellow-200",
+    "UPS": "bg-amber-100 text-amber-800 border-amber-200",
+    "FedEx": "bg-purple-100 text-purple-800 border-purple-200",
+    "SF Express": "bg-red-100 text-red-800 border-red-200",
+    "Aramex": "bg-orange-100 text-orange-800 border-orange-200",
+    "TNT": "bg-orange-100 text-orange-800 border-orange-200",
+  };
+  return colors[courier] || "bg-gray-100 text-gray-800 border-gray-200";
+};
+
+// Color coding for service types
+const getServiceColor = (service: string) => {
+  const colors: Record<string, string> = {
+    "standard": "bg-blue-100 text-blue-800 border-blue-200",
+    "express": "bg-green-100 text-green-800 border-green-200",
+    "overnight": "bg-pink-100 text-pink-800 border-pink-200",
+  };
+  return colors[service] || "bg-gray-100 text-gray-800 border-gray-200";
+};
+
+// Get service display name
+const getServiceDisplayName = (service: string) => {
+  const names: Record<string, string> = {
+    "standard": "Standard",
+    "express": "Express",
+    "overnight": "Overnight",
+  };
+  return names[service] || service.charAt(0).toUpperCase() + service.slice(1);
+};
+
 export default function ForwarderSettings({ loaderData }: Route.ComponentProps) {
   const { forwarder, settings: initialSettings } = loaderData;
   
@@ -697,15 +730,36 @@ export default function ForwarderSettings({ loaderData }: Route.ComponentProps) 
           {/* Shipping Rates Tab */}
           {activeTab === "rates" && (
             <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
                   <h2 className="text-lg font-semibold text-foreground">Shipping Rates</h2>
-                  <p className="text-sm text-muted-foreground">Set prices for each zone, courier, and service type</p>
+                  <p className="text-sm text-muted-foreground mb-3">Set prices for each zone, courier, and service type</p>
+                  
+                  {/* Color Legend */}
+                  <div className="flex flex-wrap items-center gap-4 text-xs">
+                    <div className="flex items-center gap-1">
+                      <span className="font-medium text-muted-foreground">Couriers:</span>
+                      <span className={`px-1.5 py-0.5 rounded border ${getCourierColor('DHL')}`}>DHL</span>
+                      <span className={`px-1.5 py-0.5 rounded border ${getCourierColor('UPS')}`}>UPS</span>
+                      <span className={`px-1.5 py-0.5 rounded border ${getCourierColor('FedEx')}`}>FedEx</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="font-medium text-muted-foreground">Services:</span>
+                      <span className={`px-1.5 py-0.5 rounded border ${getServiceColor('standard')}`}>Std</span>
+                      <span className={`px-1.5 py-0.5 rounded border ${getServiceColor('express')}`}>Exp</span>
+                      <span className={`px-1.5 py-0.5 rounded border ${getServiceColor('overnight')}`}>O/N</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="font-medium text-muted-foreground">Pricing:</span>
+                      <span className="px-1.5 py-0.5 rounded border bg-emerald-100 text-emerald-800 border-emerald-200">Flat</span>
+                      <span className="px-1.5 py-0.5 rounded border bg-cyan-100 text-cyan-800 border-cyan-200">Per kg</span>
+                    </div>
+                  </div>
                 </div>
                 <button
                   onClick={() => setIsAddingRate(true)}
                   disabled={!settings?.zones || settings.zones.length === 0}
-                  className="bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 font-medium shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 font-medium shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed ml-4"
                 >
                   + Add Rate
                 </button>
@@ -1095,17 +1149,25 @@ export default function ForwarderSettings({ loaderData }: Route.ComponentProps) 
                     <div key={rate._id} className="bg-background border border-border rounded-lg p-4">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
+                          <div className="flex items-center gap-3 mb-2 flex-wrap">
                             <h3 className="font-medium text-foreground">
-                              {zone?.zoneName} • {rate.courier} • {rate.serviceType.charAt(0).toUpperCase() + rate.serviceType.slice(1)}
+                              {zone?.zoneName}
                             </h3>
-                            <span className={`px-2 py-1 text-xs rounded-full ${
-                              rate.isActive 
-                                ? "bg-green-100 text-green-800" 
-                                : "bg-gray-100 text-gray-600"
-                            }`}>
-                              {rate.isActive ? "Active" : "Inactive"}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className={`px-2 py-1 text-xs font-medium rounded border ${getCourierColor(rate.courier)}`}>
+                                {rate.courier}
+                              </span>
+                              <span className={`px-2 py-1 text-xs font-medium rounded border ${getServiceColor(rate.serviceType)}`}>
+                                {getServiceDisplayName(rate.serviceType)}
+                              </span>
+                              <span className={`px-2 py-1 text-xs rounded-full ${
+                                rate.isActive 
+                                  ? "bg-green-100 text-green-800" 
+                                  : "bg-gray-100 text-gray-600"
+                              }`}>
+                                {rate.isActive ? "Active" : "Inactive"}
+                              </span>
+                            </div>
                           </div>
                           
                           {/* Weight Slabs Display */}
@@ -1113,16 +1175,22 @@ export default function ForwarderSettings({ loaderData }: Route.ComponentProps) 
                             <div className="text-sm font-medium text-foreground mb-1">Weight Slabs:</div>
                             <div className="flex flex-wrap gap-2">
                               {rate.weightSlabs?.map((slab: any, index: number) => (
-                                <div key={index} className="bg-muted px-2 py-1 rounded text-xs">
+                                <div key={index} className={`px-2 py-1 rounded text-xs border ${
+                                  slab.flatRate 
+                                    ? "bg-emerald-100 text-emerald-800 border-emerald-200" 
+                                    : "bg-cyan-100 text-cyan-800 border-cyan-200"
+                                }`}>
                                   <span className="font-medium">{slab.label}:</span>
                                   {slab.flatRate ? (
-                                    <span className="text-green-700"> ${slab.flatRate} flat</span>
+                                    <span> ${slab.flatRate} flat</span>
                                   ) : (
-                                    <span className="text-blue-700"> ${slab.ratePerKg}/kg</span>
+                                    <span> ${slab.ratePerKg}/kg</span>
                                   )}
                                 </div>
                               )) || (
-                                <div className="text-xs text-orange-600">Legacy rate structure</div>
+                                <div className="text-xs bg-orange-100 text-orange-600 px-2 py-1 rounded border border-orange-200">
+                                  Legacy rate structure
+                                </div>
                               )}
                             </div>
                           </div>
@@ -1138,13 +1206,13 @@ export default function ForwarderSettings({ loaderData }: Route.ComponentProps) 
                           {(rate.requiresSignature || rate.trackingIncluded || rate.insuranceIncluded) && (
                             <div className="flex gap-2 mt-2">
                               {rate.requiresSignature && (
-                                <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">Signature Required</span>
+                                <span className="text-xs bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded border border-indigo-200">✍️ Signature Required</span>
                               )}
                               {rate.trackingIncluded && (
-                                <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded">Tracking</span>
+                                <span className="text-xs bg-teal-100 text-teal-800 px-2 py-0.5 rounded border border-teal-200">📍 Tracking</span>
                               )}
                               {rate.insuranceIncluded && (
-                                <span className="text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded">Insurance</span>
+                                <span className="text-xs bg-violet-100 text-violet-800 px-2 py-0.5 rounded border border-violet-200">🛡️ Insurance</span>
                               )}
                             </div>
                           )}
