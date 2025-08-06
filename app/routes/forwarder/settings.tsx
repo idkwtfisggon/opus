@@ -215,6 +215,19 @@ export default function ForwarderSettings({ loaderData }: Route.ComponentProps) 
   const handleSaveRate = async () => {
     if (!forwarder || !rateForm.zoneId || !rateForm.courier) return;
     
+    // Check for duplicate courier+service combination in the same zone
+    const existingRate = settings?.rates?.find((rate: any) => 
+      rate.zoneId === rateForm.zoneId &&
+      rate.courier === rateForm.courier &&
+      rate.serviceType === rateForm.serviceType &&
+      rate._id !== editingRate?._id // Allow editing existing rate
+    );
+    
+    if (existingRate) {
+      alert(`A rate for ${rateForm.courier} ${rateForm.serviceType} service in this zone already exists. Please edit the existing rate or choose a different courier/service combination.`);
+      return;
+    }
+    
     // Validate weight slabs
     const validSlabs = rateForm.weightSlabs.filter(slab => 
       (slab.flatRate && slab.flatRate > 0) || (slab.ratePerKg && slab.ratePerKg > 0)
@@ -320,6 +333,32 @@ export default function ForwarderSettings({ loaderData }: Route.ComponentProps) 
       trackingIncluded: rate.trackingIncluded !== false,
       insuranceIncluded: rate.insuranceIncluded || false,
       isActive: rate.isActive,
+    });
+    setIsAddingRate(true);
+  };
+
+  const duplicateRate = (rate: any) => {
+    const zone = settings.zones?.find((z: any) => z._id === rate.zoneId);
+    // Clear the form first
+    setEditingRate(null);
+    setRateForm({
+      zoneId: rate.zoneId, // Keep same zone by default
+      courier: "", // Clear courier to force selection
+      serviceType: "standard", // Reset to standard
+      weightSlabs: [...rate.weightSlabs] || [
+        { minWeight: 0, maxWeight: 1, flatRate: 0, ratePerKg: undefined, label: "0-1kg" },
+        { minWeight: 1, maxWeight: 5, flatRate: undefined, ratePerKg: 0, label: "1-5kg" },
+        { minWeight: 5, maxWeight: undefined, flatRate: undefined, ratePerKg: 0, label: "5kg+" }
+      ],
+      handlingFee: rate.handlingFee,
+      insuranceFee: rate.insuranceFee || 0,
+      fuelSurcharge: rate.fuelSurcharge || 0,
+      estimatedDaysMin: rate.estimatedDaysMin,
+      estimatedDaysMax: rate.estimatedDaysMax,
+      requiresSignature: rate.requiresSignature || false,
+      trackingIncluded: rate.trackingIncluded !== false,
+      insuranceIncluded: rate.insuranceIncluded || false,
+      isActive: true, // Always set duplicated rates as active
     });
     setIsAddingRate(true);
   };
@@ -710,16 +749,42 @@ export default function ForwarderSettings({ loaderData }: Route.ComponentProps) 
                         className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary bg-background"
                       >
                         <option value="">Select Courier</option>
-                        {COURIERS.map(courier => (
-                          <option key={courier} value={courier}>{courier}</option>
-                        ))}
+                        {COURIERS.map(courier => {
+                          // Check if this courier+service combination already exists for selected zone
+                          const isDisabled = rateForm.zoneId && settings?.rates?.some((rate: any) => 
+                            rate.zoneId === rateForm.zoneId &&
+                            rate.courier === courier &&
+                            rate.serviceType === rateForm.serviceType &&
+                            rate._id !== editingRate?._id
+                          );
+                          return (
+                            <option key={courier} value={courier} disabled={isDisabled}>
+                              {courier} {isDisabled ? '(Already configured for this service)' : ''}
+                            </option>
+                          );
+                        })}
                       </select>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-foreground mb-2">Service Type</label>
                       <select
                         value={rateForm.serviceType}
-                        onChange={(e) => setRateForm({ ...rateForm, serviceType: e.target.value as any })}
+                        onChange={(e) => {
+                          const newServiceType = e.target.value as any;
+                          // Reset courier if the new service type conflicts
+                          const conflictsWithCourier = rateForm.zoneId && rateForm.courier && settings?.rates?.some((rate: any) => 
+                            rate.zoneId === rateForm.zoneId &&
+                            rate.courier === rateForm.courier &&
+                            rate.serviceType === newServiceType &&
+                            rate._id !== editingRate?._id
+                          );
+                          
+                          setRateForm({ 
+                            ...rateForm, 
+                            serviceType: newServiceType,
+                            courier: conflictsWithCourier ? "" : rateForm.courier
+                          });
+                        }}
                         className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary bg-background"
                       >
                         <option value="standard">Standard</option>
@@ -728,6 +793,27 @@ export default function ForwarderSettings({ loaderData }: Route.ComponentProps) 
                       </select>
                     </div>
                   </div>
+
+                  {/* Validation Warning */}
+                  {rateForm.zoneId && rateForm.courier && rateForm.serviceType && settings?.rates?.some((rate: any) => 
+                    rate.zoneId === rateForm.zoneId &&
+                    rate.courier === rateForm.courier &&
+                    rate.serviceType === rateForm.serviceType &&
+                    rate._id !== editingRate?._id
+                  ) && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                      <div className="flex items-start gap-3">
+                        <div className="text-red-600 mt-0.5">⚠️</div>
+                        <div>
+                          <p className="text-sm font-medium text-red-900">Duplicate Configuration</p>
+                          <p className="text-xs text-red-700 mt-1">
+                            A rate for {rateForm.courier} {rateForm.serviceType} service in this zone already exists. 
+                            Please choose a different courier or service type.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Weight Slabs */}
                   <div className="mb-6">
@@ -1065,6 +1151,13 @@ export default function ForwarderSettings({ loaderData }: Route.ComponentProps) 
                         </div>
                         
                         <div className="flex items-center gap-2 ml-4">
+                          <button
+                            onClick={() => duplicateRate(rate)}
+                            className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                            title="Duplicate this rate"
+                          >
+                            Duplicate
+                          </button>
                           <button
                             onClick={() => startEditingRate(rate)}
                             className="text-primary hover:text-primary/80 text-sm font-medium"
