@@ -70,13 +70,16 @@ export default defineSchema({
     warehouseId: v.string(),
     forwarderId: v.string(),
     
-    // Status tracking
+    // Status tracking (includes old values for migration)
     status: v.union(
       v.literal("incoming"), // Just created, heading to warehouse
-      v.literal("received"), // Arrived at warehouse
+      v.literal("received"), // OLD: Arrived at warehouse (will migrate to arrived_at_warehouse)
+      v.literal("arrived_at_warehouse"), // Arrived at warehouse/premises
       v.literal("packed"), // Ready for shipping
-      v.literal("shipped"), // Sent to customer
-      v.literal("delivered") // Final delivery
+      v.literal("awaiting_pickup"), // Ready for courier collection
+      v.literal("shipped"), // OLD: In transit (will migrate to in_transit)
+      v.literal("in_transit"), // Courier collected, delivery in progress
+      v.literal("delivered") // Arrived at destination
     ),
     
     // Shipping details

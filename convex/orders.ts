@@ -55,14 +55,14 @@ export const getForwarderStats = query({
 
     // Calculate stats based on Shibubu logic
     const pendingOrders = orders.filter(o => o.status === "incoming").length;
-    const readyToShip = orders.filter(o => o.status === "packed").length;
+    const readyToShip = orders.filter(o => o.status === "awaiting_pickup").length;
     const unassignedCouriers = orders.filter(o => !o.courier && o.status !== "delivered").length;
-    const pendingLabels = orders.filter(o => o.status === "received" && !o.labelPrinted).length;
+    const pendingLabels = orders.filter(o => o.status === "arrived_at_warehouse" && !o.labelPrinted).length;
     
     // Get stale orders (>48h old and not progressing)
     const twoDaysAgo = Date.now() - (2 * 24 * 60 * 60 * 1000);
     const staleOrders = orders.filter(o => 
-      ["incoming", "received"].includes(o.status) && 
+      ["incoming", "arrived_at_warehouse"].includes(o.status) && 
       o.createdAt < twoDaysAgo
     ).length;
 
@@ -130,6 +130,9 @@ export const createOrder = mutation({
     warehouseId: v.string(),
     forwarderId: v.string(),
     shippingType: v.union(v.literal("immediate"), v.literal("consolidated")),
+    
+    // Courier (customer pre-assigned)
+    courier: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
@@ -161,9 +164,10 @@ export const updateOrderStatus = mutation({
     orderId: v.id("orders"),
     newStatus: v.union(
       v.literal("incoming"),
-      v.literal("received"),
+      v.literal("arrived_at_warehouse"),
       v.literal("packed"),
-      v.literal("shipped"),
+      v.literal("awaiting_pickup"),
+      v.literal("in_transit"),
       v.literal("delivered")
     ),
     updatedBy: v.string(),
@@ -183,11 +187,11 @@ export const updateOrderStatus = mutation({
     };
 
     // Set specific timestamps based on status
-    if (newStatus === "received" && !order.receivedAt) {
+    if (newStatus === "arrived_at_warehouse" && !order.receivedAt) {
       updateData.receivedAt = now;
     } else if (newStatus === "packed" && !order.packedAt) {
       updateData.packedAt = now;
-    } else if (newStatus === "shipped" && !order.shippedAt) {
+    } else if (newStatus === "in_transit" && !order.shippedAt) {
       updateData.shippedAt = now;
     } else if (newStatus === "delivered" && !order.deliveredAt) {
       updateData.deliveredAt = now;
