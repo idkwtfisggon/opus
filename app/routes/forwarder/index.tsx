@@ -3,7 +3,10 @@ import { fetchQuery } from "convex/nextjs";
 import type { Route } from "./+types/index";
 import { api } from "../../../convex/_generated/api";
 import ForwarderOnboarding from "~/components/forwarder/ForwarderOnboarding";
+import OrderVolumeChart from "~/components/analytics/OrderVolumeChart";
+import CreateTestOrders from "~/components/debug/CreateTestOrders";
 import { useState } from "react";
+import { useQuery } from "convex/react";
 
 export async function loader(args: Route.LoaderArgs) {
   const { userId } = await getAuth(args);
@@ -22,21 +25,24 @@ export async function loader(args: Route.LoaderArgs) {
         hasForwarderProfile: false,
         userId,
         stats: { pendingOrders: 0, readyToShip: 0, capacityUsed: 0 },
-        recentOrders: []
+        recentOrders: [],
+        firstWarehouse: null
       };
     }
 
-    // Get real stats and orders
-    const [stats, recentOrders] = await Promise.all([
+    // Get real stats, orders, and warehouses
+    const [stats, recentOrders, warehouses] = await Promise.all([
       fetchQuery(api.orders.getForwarderStats, { forwarderId: forwarder._id }),
-      fetchQuery(api.orders.getRecentOrders, { forwarderId: forwarder._id, limit: 5 })
+      fetchQuery(api.orders.getRecentOrders, { forwarderId: forwarder._id, limit: 5 }),
+      fetchQuery(api.warehouses.getForwarderWarehouses, { forwarderId: forwarder._id })
     ]);
 
     return {
       hasForwarderProfile: true,
       forwarder,
       stats,
-      recentOrders
+      recentOrders,
+      firstWarehouse: warehouses[0] || null
     };
   } catch (error) {
     console.error("Error loading forwarder data:", error);
@@ -44,14 +50,21 @@ export async function loader(args: Route.LoaderArgs) {
       hasForwarderProfile: false,
       userId,
       stats: { pendingOrders: 0, readyToShip: 0, capacityUsed: 0 },
-      recentOrders: []
+      recentOrders: [],
+      firstWarehouse: null
     };
   }
 }
 
 export default function ForwarderDashboard({ loaderData }: Route.ComponentProps) {
-  const { hasForwarderProfile, userId, stats, recentOrders } = loaderData;
+  const { hasForwarderProfile, userId, stats, recentOrders, forwarder } = loaderData;
   const [showOnboarding, setShowOnboarding] = useState(!hasForwarderProfile);
+  
+  // Get real-time performance metrics
+  const performanceMetrics = useQuery(
+    api.analytics.getPerformanceMetrics, 
+    forwarder ? { forwarderId: forwarder._id } : "skip"
+  );
 
   if (showOnboarding) {
     return (
@@ -90,22 +103,8 @@ export default function ForwarderDashboard({ loaderData }: Route.ComponentProps)
       </div>
       
       {/* Smart Alert Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <a href="/forwarder/orders?filter=unassigned" 
-           className={`group block bg-card border border-border rounded-xl p-6 hover:shadow-md cursor-pointer transition-all duration-200 ${getAlertColor(stats.unassignedCouriers || 0)}`}>
-          <div className="flex items-center justify-between mb-3">
-            <h3 className={`font-semibold text-lg ${getTextColor(stats.unassignedCouriers || 0)}`}>
-              Unassigned Couriers
-            </h3>
-            <div className="w-2 h-2 rounded-full bg-current opacity-60"></div>
-          </div>
-          <p className={`text-3xl font-bold mb-2 ${getTextColor(stats.unassignedCouriers || 0)}`}>
-            {stats.unassignedCouriers || 0}
-          </p>
-          <p className="text-sm text-muted-foreground">Need courier assignment</p>
-        </a>
-
-        <a href="/forwarder/orders?filter=labels" 
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <a href="/forwarder/orders?status=packed&labelPrinted=false" 
            className={`group block bg-card border border-border rounded-xl p-6 hover:shadow-md cursor-pointer transition-all duration-200 ${getAlertColor(stats.pendingLabels || 0)}`}>
           <div className="flex items-center justify-between mb-3">
             <h3 className={`font-semibold text-lg ${getTextColor(stats.pendingLabels || 0)}`}>
@@ -116,10 +115,10 @@ export default function ForwarderDashboard({ loaderData }: Route.ComponentProps)
           <p className={`text-3xl font-bold mb-2 ${getTextColor(stats.pendingLabels || 0)}`}>
             {stats.pendingLabels || 0}
           </p>
-          <p className="text-sm text-muted-foreground">Ready to print</p>
+          <p className="text-sm text-muted-foreground">Need labels printed</p>
         </a>
 
-        <a href="/forwarder/orders?filter=stale" 
+        <a href="/forwarder/orders?status=incoming&daysOld=2" 
            className={`group block bg-card border border-border rounded-xl p-6 hover:shadow-md cursor-pointer transition-all duration-200 ${getAlertColor(stats.staleOrders || 0)}`}>
           <div className="flex items-center justify-between mb-3">
             <h3 className={`font-semibold text-lg ${getTextColor(stats.staleOrders || 0)}`}>
@@ -130,7 +129,7 @@ export default function ForwarderDashboard({ loaderData }: Route.ComponentProps)
           <p className={`text-3xl font-bold mb-2 ${getTextColor(stats.staleOrders || 0)}`}>
             {stats.staleOrders || 0}
           </p>
-          <p className="text-sm text-muted-foreground">&gt;48h old</p>
+          <p className="text-sm text-muted-foreground">&gt;48h old, no progress</p>
         </a>
 
         <div className="bg-card border border-border rounded-xl p-6">
@@ -156,37 +155,64 @@ export default function ForwarderDashboard({ loaderData }: Route.ComponentProps)
           <button className="bg-primary text-primary-foreground px-6 py-3 rounded-lg hover:bg-primary/90 font-medium shadow-sm transition-all duration-200">
             + Add Manual Order
           </button>
-          <a href="/forwarder/orders?filter=received" 
+          <a href="/forwarder/orders?status=arrived_at_warehouse" 
              className="bg-secondary text-secondary-foreground px-6 py-3 rounded-lg hover:bg-secondary/80 font-medium shadow-sm transition-all duration-200 inline-block">
             View Arrived Orders ({stats.readyToShip})
           </a>
-          <a href="/forwarder/orders?filter=bulk" 
+          <a href="/forwarder/orders" 
              className="border border-border bg-background text-foreground px-6 py-3 rounded-lg hover:bg-accent hover:text-accent-foreground font-medium shadow-sm transition-all duration-200 inline-block">
-            Bulk Assign Courier ({stats.unassignedCouriers || 0})
+            View All Orders ({stats.totalOrders})
           </a>
         </div>
       </div>
 
-      {/* Order Volume Calendar */}
-      <div className="bg-card border border-border rounded-xl p-6">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-semibold text-foreground">Order Volume</h2>
-          <div className="text-sm text-muted-foreground">
-            Click any day to view orders
-          </div>
-        </div>
-        <div className="text-center py-12 border-2 border-dashed border-border rounded-lg">
-          <div className="max-w-sm mx-auto">
-            <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-6 h-6 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
+      {/* Debug Component */}
+      {forwarder && stats.totalOrders === 0 && loaderData.firstWarehouse && (
+        <CreateTestOrders forwarderId={forwarder._id} warehouseId={loaderData.firstWarehouse._id} />
+      )}
+      
+      {/* Order Volume Analytics */}
+      {forwarder && <OrderVolumeChart forwarderId={forwarder._id} />}
+      
+      {/* Performance Metrics */}
+      {performanceMetrics && (
+        <div className="bg-card border border-border rounded-xl p-6">
+          <h3 className="text-lg font-semibold text-foreground mb-6">Performance Metrics</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-primary mb-1">
+                {performanceMetrics.averageProcessingTime.toFixed(1)}h
+              </div>
+              <div className="text-sm text-muted-foreground">Avg Processing Time</div>
+              <div className="text-xs text-muted-foreground mt-1">Received → Packed</div>
             </div>
-            <p className="text-muted-foreground mb-2">Order volume calendar coming soon</p>
-            <p className="text-sm text-muted-foreground">Interactive calendar view with daily order counts</p>
+            
+            <div className="text-center">
+              <div className="text-2xl font-bold text-green-600 mb-1">
+                {performanceMetrics.averageShippingTime.toFixed(1)}h
+              </div>
+              <div className="text-sm text-muted-foreground">Avg Shipping Time</div>
+              <div className="text-xs text-muted-foreground mt-1">Packed → Shipped</div>
+            </div>
+            
+            <div className="text-center">
+              <div className="text-2xl font-bold text-blue-600 mb-1">
+                {performanceMetrics.onTimeDeliveryRate}%
+              </div>
+              <div className="text-sm text-muted-foreground">On-Time Delivery</div>
+              <div className="text-xs text-muted-foreground mt-1">Last 30 days</div>
+            </div>
+            
+            <div className="text-center">
+              <div className="text-2xl font-bold text-yellow-600 mb-1">
+                {performanceMetrics.customerSatisfactionScore}
+              </div>
+              <div className="text-sm text-muted-foreground">Customer Rating</div>
+              <div className="text-xs text-muted-foreground mt-1">Out of 5.0</div>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Orders */}

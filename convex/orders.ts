@@ -56,8 +56,11 @@ export const getForwarderStats = query({
     // Calculate stats based on Shibubu logic
     const pendingOrders = orders.filter(o => o.status === "incoming").length;
     const readyToShip = orders.filter(o => o.status === "awaiting_pickup").length;
-    const unassignedCouriers = orders.filter(o => !o.courier && o.status !== "delivered").length;
-    const pendingLabels = orders.filter(o => o.status === "arrived_at_warehouse" && !o.labelPrinted).length;
+    
+    // Pending labels: orders that are packed/ready but haven't had labels printed
+    const pendingLabels = orders.filter(o => 
+      ["packed", "awaiting_pickup"].includes(o.status) && !o.labelPrinted
+    ).length;
     
     // Get stale orders (>48h old and not progressing)
     const twoDaysAgo = Date.now() - (2 * 24 * 60 * 60 * 1000);
@@ -80,7 +83,6 @@ export const getForwarderStats = query({
       totalOrders: orders.length,
       pendingOrders,
       readyToShip,
-      unassignedCouriers,
       pendingLabels,
       staleOrders,
       capacityUsed,
@@ -133,9 +135,12 @@ export const createOrder = mutation({
     
     // Courier (customer pre-assigned)
     courier: v.optional(v.string()),
+    
+    // Optional override for testing
+    createdAt: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const now = Date.now();
+    const now = args.createdAt || Date.now();
     
     const orderId = await ctx.db.insert("orders", {
       ...args,
