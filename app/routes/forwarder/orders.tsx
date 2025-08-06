@@ -52,6 +52,15 @@ export default function ManageOrders({ loaderData }: Route.ComponentProps) {
   const createOrder = useMutation(api.orders.createOrder);
   const updateOrderStatus = useMutation(api.orders.updateOrderStatus);
 
+  // Filter and sort states
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState("date-desc");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [courierFilter, setCourierFilter] = useState("");
+  const [shippingTypeFilter, setShippingTypeFilter] = useState("");
+  const [dateRangeFilter, setDateRangeFilter] = useState("");
+  const [quickFilter, setQuickFilter] = useState("");
+
   const handleCreateTestOrder = async () => {
     if (!forwarder || !firstWarehouse) {
       alert("Need forwarder profile and warehouse to create test orders");
@@ -123,6 +132,117 @@ export default function ManageOrders({ loaderData }: Route.ComponentProps) {
     }
   };
 
+  // Filter and sort orders
+  const getFilteredAndSortedOrders = () => {
+    let filtered = [...orders];
+
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(order => 
+        order.customerName.toLowerCase().includes(query) ||
+        order.trackingNumber.toLowerCase().includes(query) ||
+        order.merchantName.toLowerCase().includes(query) ||
+        order.customerEmail.toLowerCase().includes(query) ||
+        order._id.toLowerCase().includes(query)
+      );
+    }
+
+    // Apply status filter
+    if (statusFilter) {
+      filtered = filtered.filter(order => order.status === statusFilter);
+    }
+
+    // Apply courier filter
+    if (courierFilter) {
+      if (courierFilter === "__no_courier__") {
+        filtered = filtered.filter(order => !order.courier);
+      } else {
+        filtered = filtered.filter(order => order.courier === courierFilter);
+      }
+    }
+
+    // Apply shipping type filter
+    if (shippingTypeFilter) {
+      filtered = filtered.filter(order => order.shippingType === shippingTypeFilter);
+    }
+
+    // Apply date range filter
+    if (dateRangeFilter) {
+      const now = new Date();
+      const daysAgo = parseInt(dateRangeFilter);
+      const cutoffDate = new Date(now.getTime() - (daysAgo * 24 * 60 * 60 * 1000));
+      filtered = filtered.filter(order => new Date(order.createdAt) >= cutoffDate);
+    }
+
+    // Apply quick filters
+    if (quickFilter === "ready-to-print") {
+      filtered = filtered.filter(order => 
+        order.status === "arrived_at_warehouse" && order.courier
+      );
+    } else if (quickFilter === "needs-attention") {
+      filtered = filtered.filter(order => 
+        (order.status === "arrived_at_warehouse" && !order.courier) ||
+        (order.status === "incoming" && new Date(order.createdAt) < new Date(Date.now() - 2 * 24 * 60 * 60 * 1000))
+      );
+    } else if (quickFilter === "in-transit") {
+      filtered = filtered.filter(order => 
+        order.status === "in_transit" || order.status === "awaiting_pickup"
+      );
+    }
+
+    // Apply sorting
+    filtered.sort((a, b) => {
+      switch (sortBy) {
+        case "date-desc":
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        case "date-asc":
+          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        case "customer-az":
+          return a.customerName.localeCompare(b.customerName);
+        case "customer-za":
+          return b.customerName.localeCompare(a.customerName);
+        case "weight-desc":
+          return b.declaredWeight - a.declaredWeight;
+        case "weight-asc":
+          return a.declaredWeight - b.declaredWeight;
+        case "status":
+          const statusOrder = ["incoming", "arrived_at_warehouse", "packed", "awaiting_pickup", "in_transit", "delivered"];
+          return statusOrder.indexOf(a.status) - statusOrder.indexOf(b.status);
+        default:
+          return 0;
+      }
+    });
+
+    return filtered;
+  };
+
+  const filteredOrders = getFilteredAndSortedOrders();
+
+  // Clear all filters
+  const clearAllFilters = () => {
+    setSearchQuery("");
+    setSortBy("date-desc");
+    setStatusFilter("");
+    setCourierFilter("");
+    setShippingTypeFilter("");
+    setDateRangeFilter("");
+    setQuickFilter("");
+  };
+
+  // Get unique couriers for filter dropdown
+  const availableCouriers = [...new Set(orders.filter(order => order.courier).map(order => order.courier))];
+
+  // Active filters count  
+  const activeFiltersCount = [
+    searchQuery,
+    statusFilter,
+    courierFilter,
+    shippingTypeFilter,
+    dateRangeFilter,
+    quickFilter
+  ].filter(Boolean).length + (sortBy !== "date-desc" ? 1 : 0);
+
   return (
     <div className="space-y-6 p-6">
       {/* Header */}
@@ -149,14 +269,151 @@ export default function ManageOrders({ loaderData }: Route.ComponentProps) {
         </button>
       </div>
 
+      {/* Filters & Search */}
+      <div className="bg-card border border-border rounded-xl p-6">
+        <div className="space-y-4">
+          {/* Quick Filters */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm font-medium text-foreground">Quick Filters:</span>
+            <button
+              onClick={() => setQuickFilter(quickFilter === "ready-to-print" ? "" : "ready-to-print")}
+              className={`px-3 py-1 text-xs rounded-full font-medium transition-colors ${
+                quickFilter === "ready-to-print" 
+                  ? "bg-green-100 text-green-800 border border-green-200" 
+                  : "bg-muted text-muted-foreground hover:bg-muted/80"
+              }`}
+            >
+              Ready to Print
+            </button>
+            <button
+              onClick={() => setQuickFilter(quickFilter === "needs-attention" ? "" : "needs-attention")}
+              className={`px-3 py-1 text-xs rounded-full font-medium transition-colors ${
+                quickFilter === "needs-attention" 
+                  ? "bg-red-100 text-red-800 border border-red-200" 
+                  : "bg-muted text-muted-foreground hover:bg-muted/80"
+              }`}
+            >
+              Needs Attention
+            </button>
+            <button
+              onClick={() => setQuickFilter(quickFilter === "in-transit" ? "" : "in-transit")}
+              className={`px-3 py-1 text-xs rounded-full font-medium transition-colors ${
+                quickFilter === "in-transit" 
+                  ? "bg-blue-100 text-blue-800 border border-blue-200" 
+                  : "bg-muted text-muted-foreground hover:bg-muted/80"
+              }`}
+            >
+              In Transit
+            </button>
+            {activeFiltersCount > 0 && (
+              <button
+                onClick={clearAllFilters}
+                className="px-3 py-1 text-xs rounded-full font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
+              >
+                Clear All ({activeFiltersCount})
+              </button>
+            )}
+          </div>
+
+          {/* Search and Filters Row */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+            {/* Search */}
+            <div className="xl:col-span-2">
+              <input
+                type="text"
+                placeholder="Search orders..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-border rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary bg-background"
+              />
+            </div>
+
+            {/* Sort By */}
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="px-3 py-2 text-sm border border-border rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary bg-background"
+            >
+              <option value="date-desc">Newest First</option>
+              <option value="date-asc">Oldest First</option>
+              <option value="customer-az">Customer A-Z</option>
+              <option value="customer-za">Customer Z-A</option>
+              <option value="weight-desc">Heaviest First</option>
+              <option value="weight-asc">Lightest First</option>
+              <option value="status">By Status</option>
+            </select>
+
+            {/* Status Filter */}
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-3 py-2 text-sm border border-border rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary bg-background"
+            >
+              <option value="">All Statuses</option>
+              <option value="incoming">Incoming</option>
+              <option value="arrived_at_warehouse">Arrived on Premises</option>
+              <option value="packed">Packed</option>
+              <option value="awaiting_pickup">Awaiting Pickup</option>
+              <option value="in_transit">Delivery in Progress</option>
+              <option value="delivered">Arrived at Destination</option>
+            </select>
+
+            {/* Courier Filter */}
+            <select
+              value={courierFilter}
+              onChange={(e) => setCourierFilter(e.target.value)}
+              className="px-3 py-2 text-sm border border-border rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary bg-background"
+            >
+              <option value="">All Couriers</option>
+              {availableCouriers.map(courier => (
+                <option key={courier} value={courier}>{courier}</option>
+              ))}
+              <option value="__no_courier__">No Courier Assigned</option>
+            </select>
+
+            {/* Shipping Type Filter */}
+            <select
+              value={shippingTypeFilter}
+              onChange={(e) => setShippingTypeFilter(e.target.value)}
+              className="px-3 py-2 text-sm border border-border rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary bg-background"
+            >
+              <option value="">All Types</option>
+              <option value="immediate">Immediate</option>
+              <option value="consolidated">Consolidated</option>
+            </select>
+          </div>
+
+          {/* Date Range Filter */}
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-medium text-foreground">Date Range:</span>
+            <select
+              value={dateRangeFilter}
+              onChange={(e) => setDateRangeFilter(e.target.value)}
+              className="px-3 py-2 text-sm border border-border rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary bg-background"
+            >
+              <option value="">All Time</option>
+              <option value="1">Last 24 Hours</option>
+              <option value="7">Last 7 Days</option>
+              <option value="30">Last 30 Days</option>
+              <option value="90">Last 90 Days</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
       {/* Orders Table */}
       <div className="bg-card border border-border rounded-xl">
         <div className="p-6 border-b border-border">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-foreground">Orders</h2>
-            <p className="text-sm text-muted-foreground">
-              Total: <span className="font-medium">{orders.length}</span>
-            </p>
+            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+              <span>
+                Showing: <span className="font-medium text-foreground">{filteredOrders.length}</span>
+              </span>
+              <span>
+                Total: <span className="font-medium text-foreground">{orders.length}</span>
+              </span>
+            </div>
           </div>
         </div>
 
@@ -176,20 +433,23 @@ export default function ManageOrders({ loaderData }: Route.ComponentProps) {
               </tr>
             </thead>
             <tbody>
-              {orders.length === 0 ? (
+              {filteredOrders.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="text-center p-8 text-muted-foreground">
-                    No orders found. Orders will appear here once you start receiving them.
+                    {orders.length === 0 
+                      ? "No orders found. Orders will appear here once you start receiving them."
+                      : "No orders match your current filters. Try adjusting your search criteria."
+                    }
                   </td>
                 </tr>
               ) : (
-                orders.map((order) => (
+                filteredOrders.map((order) => (
                   <tr key={order._id} className="border-t border-border hover:bg-muted/25">
                     <td className="p-4 text-sm font-medium text-foreground">
                       {order._id.slice(-8).toUpperCase()}
                     </td>
                     <td className="p-4 text-sm text-muted-foreground">
-                      {new Date(order.createdAt).toLocaleString()}
+                      {new Date(order.createdAt).toLocaleDateString()} {new Date(order.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                     </td>
                     <td className="p-4 text-sm text-foreground">
                       {order.customerName}
