@@ -13,6 +13,7 @@ import type {
   FilterApi,
   FunctionReference,
 } from "convex/server";
+import type * as forwarderSettings from "../forwarderSettings.js";
 import type * as forwarders from "../forwarders.js";
 import type * as http from "../http.js";
 import type * as migrate from "../migrate.js";
@@ -30,6 +31,7 @@ import type * as warehouses from "../warehouses.js";
  * ```
  */
 declare const fullApi: ApiFromModules<{
+  forwarderSettings: typeof forwarderSettings;
   forwarders: typeof forwarders;
   http: typeof http;
   migrate: typeof migrate;

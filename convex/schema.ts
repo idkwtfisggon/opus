@@ -117,6 +117,92 @@ export default defineSchema({
     timestamp: v.number(),
   }).index("by_order", ["orderId"]),
 
+  // Forwarder shipping zones and rates
+  shippingZones: defineTable({
+    forwarderId: v.string(),
+    zoneName: v.string(), // "Domestic", "Regional", "International", etc.
+    countries: v.array(v.string()), // Array of country codes ["US", "CA", "MX"]
+    isActive: v.boolean(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_forwarder", ["forwarderId"])
+    .index("by_active", ["forwarderId", "isActive"]),
+
+  // Hierarchical shipping rates: Zone → Courier → Service → Weight Slabs
+  shippingRates: defineTable({
+    forwarderId: v.string(),
+    zoneId: v.string(), // Links to shippingZones
+    courier: v.string(), // "DHL", "UPS", "FedEx", etc.
+    
+    // Service types
+    serviceType: v.union(
+      v.literal("standard"), 
+      v.literal("express"), 
+      v.literal("overnight")
+    ),
+    
+    // Weight-based pricing slabs (array of weight ranges)
+    weightSlabs: v.array(v.object({
+      minWeight: v.number(), // kg (e.g., 0)
+      maxWeight: v.optional(v.number()), // kg (e.g., 1), null for unlimited
+      ratePerKg: v.optional(v.number()), // Rate per kg for this range
+      flatRate: v.optional(v.number()), // Flat rate (overrides per kg)
+      label: v.string(), // Human readable: "0-1kg", "1-5kg", "5kg+"
+    })),
+    
+    // Additional fees (applied to all weight slabs)
+    handlingFee: v.number(),
+    insuranceFee: v.optional(v.number()),
+    fuelSurcharge: v.optional(v.number()),
+    
+    // Delivery timeframe
+    estimatedDaysMin: v.number(),
+    estimatedDaysMax: v.number(),
+    
+    // Service-specific settings
+    requiresSignature: v.optional(v.boolean()),
+    trackingIncluded: v.optional(v.boolean()),
+    insuranceIncluded: v.optional(v.boolean()),
+    
+    isActive: v.boolean(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_forwarder", ["forwarderId"])
+    .index("by_zone", ["zoneId"])
+    .index("by_courier", ["courier"])
+    .index("by_service", ["serviceType"])
+    .index("by_zone_courier", ["zoneId", "courier"])
+    .index("by_zone_service", ["zoneId", "serviceType"])
+    .index("by_active", ["forwarderId", "isActive"]),
+
+  // Consolidated shipping settings
+  consolidatedShippingSettings: defineTable({
+    forwarderId: v.string(),
+    
+    // Enable/disable consolidated shipping
+    isEnabled: v.boolean(),
+    
+    // Holding period settings
+    holdingPeriodDays: v.number(), // Must be >= 7
+    
+    // Consolidated shipping rates (usually discounted)
+    discountPercentage: v.optional(v.number()), // Discount from standard rates
+    minimumPackages: v.optional(v.number()), // Min packages to consolidate
+    maximumPackages: v.optional(v.number()), // Max packages per consolidated shipment
+    
+    // Consolidation schedule
+    consolidationFrequency: v.optional(v.union(
+      v.literal("weekly"),
+      v.literal("biweekly"), 
+      v.literal("monthly"),
+      v.literal("custom")
+    )),
+    
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_forwarder", ["forwarderId"])
+    .index("by_enabled", ["forwarderId", "isEnabled"]),
+
   // Keep existing tables (commented for now)
   subscriptions: defineTable({
     userId: v.optional(v.string()),
