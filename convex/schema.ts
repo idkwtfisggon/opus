@@ -19,6 +19,7 @@ export default defineSchema({
     businessName: v.string(),
     contactEmail: v.string(),
     contactPhone: v.optional(v.string()),
+    timezone: v.optional(v.string()), // User's timezone (e.g., "Asia/Singapore")
     isActive: v.boolean(),
     createdAt: v.number(),
     updatedAt: v.number(),

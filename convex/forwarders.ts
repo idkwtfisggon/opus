@@ -55,6 +55,7 @@ export const upsertForwarder = mutation({
     businessName: v.string(),
     contactEmail: v.string(),
     contactPhone: v.optional(v.string()),
+    timezone: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const existing = await ctx.db

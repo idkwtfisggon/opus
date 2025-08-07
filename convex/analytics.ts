@@ -1,5 +1,6 @@
 import { query } from "./_generated/server";
 import { v } from "convex/values";
+import { toUserTimezoneDate, daysBetweenInTimezone } from "./utils/timezone";
 
 // Get order volume analytics for forwarder dashboard
 export const getOrderVolumeAnalytics = query({
@@ -11,6 +12,18 @@ export const getOrderVolumeAnalytics = query({
     const { forwarderId, daysBack } = args;
     const now = Date.now();
     
+    // Get forwarder account creation date
+    const forwarder = await ctx.db
+      .query("forwarders")
+      .filter((q) => q.eq(q.field("_id"), forwarderId))
+      .first();
+    
+    // Get user's timezone (default to UTC if not set)
+    const userTimezone = forwarder?.timezone || 'UTC';
+    
+    // Convert account creation to user's timezone for display
+    const accountCreationDate = forwarder ? toUserTimezoneDate(forwarder._creationTime, userTimezone) : null;
+    
     // Use daysBack parameter or default to 30 days
     const startTime = now - ((daysBack || 30) * 24 * 60 * 60 * 1000);
     
@@ -20,6 +33,13 @@ export const getOrderVolumeAnalytics = query({
       .withIndex("by_forwarder", (q) => q.eq("forwarderId", forwarderId))
       .filter((q) => q.gte(q.field("createdAt"), startTime))
       .collect();
+    
+    // Get ALL orders since account creation for proper average calculation
+    const allOrdersSinceCreation = forwarder ? await ctx.db
+      .query("orders")
+      .withIndex("by_forwarder", (q) => q.eq("forwarderId", forwarderId))
+      .filter((q) => q.gte(q.field("createdAt"), forwarder._creationTime))
+      .collect() : [];
       
     console.log(`Analytics debug: Found ${orders.length} orders for forwarder ${forwarderId}`);
     console.log(`Date range: ${new Date(startTime).toISOString()} to ${new Date(now).toISOString()}`);
@@ -34,12 +54,10 @@ export const getOrderVolumeAnalytics = query({
     let totalWeight = 0;
     
     orders.forEach(order => {
-      // Convert to Singapore timezone (UTC+8) properly
-      const utcDate = new Date(order.createdAt);
-      const sgDate = new Date(utcDate.getTime() + (8 * 60 * 60 * 1000));
-      const date = sgDate.toISOString().split('T')[0];
+      // Convert to user's timezone properly
+      const date = toUserTimezoneDate(order.createdAt, userTimezone);
       
-      console.log(`Order created: ${utcDate.toISOString()} -> SG: ${sgDate.toISOString()} -> Date: ${date}`);
+      console.log(`Order created: ${new Date(order.createdAt).toISOString()} -> ${userTimezone}: ${date}`);
       
       // Daily volume
       dailyVolume[date] = (dailyVolume[date] || 0) + 1;
@@ -61,16 +79,14 @@ export const getOrderVolumeAnalytics = query({
       totalWeight += order.declaredWeight;
     });
 
-    // Fill in missing dates with 0 volume (Singapore timezone)
+    // Fill in missing dates with 0 volume (user timezone)
     const filledDailyVolume: Array<{ date: string; count: number; revenue: number }> = [];
     const totalDays = daysBack || 30;
     
     for (let i = totalDays - 1; i >= 0; i--) {
-      // Generate date in Singapore timezone
+      // Generate date in user's timezone
       const dayStart = now - (i * 24 * 60 * 60 * 1000);
-      const utcDate = new Date(dayStart);
-      const sgDate = new Date(utcDate.getTime() + (8 * 60 * 60 * 1000));
-      const date = sgDate.toISOString().split('T')[0];
+      const date = toUserTimezoneDate(dayStart, userTimezone);
       
       filledDailyVolume.push({
         date,
@@ -108,6 +124,23 @@ export const getOrderVolumeAnalytics = query({
       lastMonthOrders,
       monthOverMonthGrowth: Math.round(monthOverMonthGrowth * 10) / 10,
       
+      // Account creation info
+      accountCreationDate: accountCreationDate || null,
+      
+      // Average calculation since account creation (user timezone)
+      averageDailyOrdersSinceCreation: forwarder ? (() => {
+        // Use timezone utility for proper calculation
+        const daysDiff = daysBetweenInTimezone(
+          forwarder._creationTime,
+          now,
+          userTimezone,
+          true // inclusive
+        );
+        
+        console.log(`USER TIMEZONE CALCULATION: Creation ${accountCreationDate}, Today ${toUserTimezoneDate(now, userTimezone)}, Days: ${daysDiff}, Orders: ${allOrdersSinceCreation.length}, Timezone: ${userTimezone}`);
+        
+        return daysDiff > 0 ? Math.round((allOrdersSinceCreation.length / daysDiff) * 100) / 100 : 0;
+      })() : 0,
       
       // Breakdowns
       courierBreakdown: Object.entries(courierBreakdown)

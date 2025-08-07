@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation } from "convex/react";
 import { CheckCircle, Building, MapPin, Phone, Mail, ArrowRight, ArrowLeft } from "lucide-react";
 import { Button } from "~/components/ui/button";
@@ -13,6 +13,7 @@ interface FormData {
   businessName: string;
   contactEmail: string;
   contactPhone: string;
+  timezone: string;
   address: string;
   city: string;
   state: string;
@@ -60,6 +61,7 @@ export default function ForwarderOnboarding({ userId, onComplete }: ForwarderOnb
     businessName: "",
     contactEmail: "",
     contactPhone: "",
+    timezone: "",
     address: "",
     city: "",
     state: "",
@@ -69,6 +71,17 @@ export default function ForwarderOnboarding({ userId, onComplete }: ForwarderOnb
     maxParcels: 100,
     maxWeightKg: 30
   });
+  
+  // Auto-detect timezone on component mount
+  useEffect(() => {
+    try {
+      const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      setFormData(prev => ({ ...prev, timezone: detectedTimezone }));
+    } catch (error) {
+      console.error('Failed to detect timezone:', error);
+      setFormData(prev => ({ ...prev, timezone: 'UTC' }));
+    }
+  }, []);
 
   const updateFormData = (field: keyof FormData, value: string | number) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -112,6 +125,7 @@ export default function ForwarderOnboarding({ userId, onComplete }: ForwarderOnb
         businessName: formData.businessName,
         contactEmail: formData.contactEmail,
         contactPhone: formData.contactPhone || undefined,
+        timezone: formData.timezone || 'UTC',
       });
 
       // Create initial warehouse
