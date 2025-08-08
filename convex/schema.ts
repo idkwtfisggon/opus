@@ -48,7 +48,7 @@ export default defineSchema({
         open: v.string(), // HH:MM format
         close: v.string(), // HH:MM format
       })),
-    })))
+    })),
     
     isActive: v.boolean(),
     createdAt: v.number(),

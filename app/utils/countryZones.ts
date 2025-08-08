@@ -4,13 +4,16 @@ export const countryZoneList = {
       "China",
       "Hong Kong",
       "Japan",
+      "Macau",
       "Mongolia",
       "South Korea",
       "Taiwan"
     ],
     "Southeast Asia": [
       "Brunei",
+      "Cambodia",
       "Indonesia",
+      "Laos",
       "Malaysia",
       "Myanmar",
       "Philippines",
@@ -20,6 +23,7 @@ export const countryZoneList = {
       "Vietnam"
     ],
     "South Asia": [
+      "Afghanistan",
       "Bangladesh",
       "Bhutan",
       "India",
@@ -48,7 +52,6 @@ export const countryZoneList = {
       "Kuwait",
       "Lebanon",
       "Oman",
-      "Palestine",
       "Qatar",
       "Saudi Arabia",
       "Syria",
@@ -101,7 +104,7 @@ export const countryZoneList = {
     "Eastern Europe": [
       "Belarus",
       "Bulgaria",
-      "Czech Republic",
+      "Czechia",
       "Hungary",
       "Moldova",
       "Poland",
@@ -122,20 +125,50 @@ export const countryZoneList = {
     ],
     "Sub-Saharan Africa": [
       "Angola",
+      "Benin",
       "Botswana",
+      "Burkina Faso",
+      "Burundi",
+      "Cabo Verde",
       "Cameroon",
-      "Côte d'Ivoire",
+      "Central African Republic",
+      "Chad",
+      "Comoros",
+      "Congo",
+      "Democratic Republic of the Congo",
+      "Djibouti",
+      "Equatorial Guinea",
+      "Eritrea",
+      "Eswatini",
       "Ethiopia",
+      "Gabon",
+      "Gambia",
       "Ghana",
+      "Guinea",
+      "Guinea-Bissau",
+      "Ivory Coast",
       "Kenya",
+      "Lesotho",
+      "Liberia",
       "Madagascar",
+      "Malawi",
+      "Mali",
+      "Mauritania",
+      "Mauritius",
       "Mozambique",
       "Namibia",
+      "Niger",
       "Nigeria",
       "Rwanda",
+      "Sao Tome and Principe",
       "Senegal",
+      "Seychelles",
+      "Sierra Leone",
+      "Somalia",
       "South Africa",
+      "South Sudan",
       "Tanzania",
+      "Togo",
       "Uganda",
       "Zambia",
       "Zimbabwe"
@@ -148,18 +181,25 @@ export const countryZoneList = {
       "Mexico"
     ],
     "Central America & Caribbean": [
+      "Antigua and Barbuda",
       "Bahamas",
       "Barbados",
       "Belize",
       "Costa Rica",
       "Cuba",
+      "Dominica",
       "Dominican Republic",
       "El Salvador",
+      "Grenada",
       "Guatemala",
+      "Haiti",
       "Honduras",
       "Jamaica",
       "Nicaragua",
       "Panama",
+      "Saint Kitts and Nevis",
+      "Saint Lucia",
+      "Saint Vincent and the Grenadines",
       "Trinidad and Tobago"
     ]
   },
@@ -171,8 +211,10 @@ export const countryZoneList = {
       "Chile",
       "Colombia",
       "Ecuador",
+      "Guyana",
       "Paraguay",
       "Peru",
+      "Suriname",
       "Uruguay",
       "Venezuela"
     ]
@@ -182,7 +224,8 @@ export const countryZoneList = {
       "Australia",
       "Fiji",
       "Kiribati",
-      "Micronesia",
+      "Marshall Islands",
+      "Micronesia, Federated States of",
       "Nauru",
       "New Zealand",
       "Palau",
@@ -200,42 +243,81 @@ export const countryZoneList = {
 export const getAllCountries = () => {
   const countries: Array<{name: string, code: string}> = [];
   
-  // Convert country names to country codes (simplified mapping)
+  // Convert country names to country codes (complete mapping)
   const countryCodeMap: Record<string, string> = {
-    "China": "CN", "Hong Kong": "HK", "Japan": "JP", "Mongolia": "MN", "South Korea": "KR", "Taiwan": "TW",
-    "Brunei": "BN", "Indonesia": "ID", "Malaysia": "MY", "Myanmar": "MM", "Philippines": "PH", 
-    "Singapore": "SG", "Thailand": "TH", "Timor-Leste": "TL", "Vietnam": "VN",
-    "Bangladesh": "BD", "Bhutan": "BT", "India": "IN", "Maldives": "MV", "Nepal": "NP", 
-    "Pakistan": "PK", "Sri Lanka": "LK",
+    // Asia - East Asia
+    "China": "CN", "Hong Kong": "HK", "Japan": "JP", "Macau": "MO", "Mongolia": "MN", "South Korea": "KR", "Taiwan": "TW",
+    
+    // Asia - Southeast Asia
+    "Brunei": "BN", "Cambodia": "KH", "Indonesia": "ID", "Laos": "LA", "Malaysia": "MY", "Myanmar": "MM", 
+    "Philippines": "PH", "Singapore": "SG", "Thailand": "TH", "Timor-Leste": "TL", "Vietnam": "VN",
+    
+    // Asia - South Asia
+    "Afghanistan": "AF", "Bangladesh": "BD", "Bhutan": "BT", "India": "IN", "Maldives": "MV", 
+    "Nepal": "NP", "Pakistan": "PK", "Sri Lanka": "LK",
+    
+    // Asia - Central Asia
     "Kazakhstan": "KZ", "Kyrgyzstan": "KG", "Tajikistan": "TJ", "Turkmenistan": "TM", "Uzbekistan": "UZ",
+    
+    // Asia - Western Asia (Middle East)
     "Armenia": "AM", "Azerbaijan": "AZ", "Bahrain": "BH", "Cyprus": "CY", "Georgia": "GE",
     "Iran": "IR", "Iraq": "IQ", "Israel": "IL", "Jordan": "JO", "Kuwait": "KW", "Lebanon": "LB",
-    "Oman": "OM", "Palestine": "PS", "Qatar": "QA", "Saudi Arabia": "SA", "Syria": "SY",
-    "Turkey": "TR", "United Arab Emirates": "AE", "Yemen": "YE",
+    "Oman": "OM", "Qatar": "QA", "Saudi Arabia": "SA", "Syria": "SY", "Turkey": "TR", 
+    "United Arab Emirates": "AE", "Yemen": "YE",
+    
+    // Europe - Western Europe
     "Austria": "AT", "Belgium": "BE", "France": "FR", "Germany": "DE", "Liechtenstein": "LI",
     "Luxembourg": "LU", "Monaco": "MC", "Netherlands": "NL", "Switzerland": "CH",
+    
+    // Europe - Northern Europe
     "Denmark": "DK", "Estonia": "EE", "Finland": "FI", "Iceland": "IS", "Ireland": "IE",
     "Latvia": "LV", "Lithuania": "LT", "Norway": "NO", "Sweden": "SE", "United Kingdom": "GB",
+    
+    // Europe - Southern Europe
     "Albania": "AL", "Andorra": "AD", "Bosnia and Herzegovina": "BA", "Croatia": "HR", 
     "Greece": "GR", "Italy": "IT", "Malta": "MT", "Montenegro": "ME", "North Macedonia": "MK",
     "Portugal": "PT", "San Marino": "SM", "Serbia": "RS", "Slovenia": "SI", "Spain": "ES", 
     "Vatican City": "VA",
-    "Belarus": "BY", "Bulgaria": "BG", "Czech Republic": "CZ", "Hungary": "HU", "Moldova": "MD",
+    
+    // Europe - Eastern Europe
+    "Belarus": "BY", "Bulgaria": "BG", "Czechia": "CZ", "Hungary": "HU", "Moldova": "MD",
     "Poland": "PL", "Romania": "RO", "Russia": "RU", "Slovakia": "SK", "Ukraine": "UA",
+    
+    // Africa - North Africa
     "Algeria": "DZ", "Egypt": "EG", "Libya": "LY", "Morocco": "MA", "Sudan": "SD", "Tunisia": "TN",
-    "Angola": "AO", "Botswana": "BW", "Cameroon": "CM", "Côte d'Ivoire": "CI", "Ethiopia": "ET",
-    "Ghana": "GH", "Kenya": "KE", "Madagascar": "MG", "Mozambique": "MZ", "Namibia": "NA",
-    "Nigeria": "NG", "Rwanda": "RW", "Senegal": "SN", "South Africa": "ZA", "Tanzania": "TZ",
-    "Uganda": "UG", "Zambia": "ZM", "Zimbabwe": "ZW",
+    
+    // Africa - Sub-Saharan Africa
+    "Angola": "AO", "Benin": "BJ", "Botswana": "BW", "Burkina Faso": "BF", "Burundi": "BI", 
+    "Cabo Verde": "CV", "Cameroon": "CM", "Central African Republic": "CF", "Chad": "TD", 
+    "Comoros": "KM", "Congo": "CG", "Democratic Republic of the Congo": "CD", "Djibouti": "DJ", 
+    "Equatorial Guinea": "GQ", "Eritrea": "ER", "Eswatini": "SZ", "Ethiopia": "ET", "Gabon": "GA", 
+    "Gambia": "GM", "Ghana": "GH", "Guinea": "GN", "Guinea-Bissau": "GW", "Ivory Coast": "CI", 
+    "Kenya": "KE", "Lesotho": "LS", "Liberia": "LR", "Madagascar": "MG", "Malawi": "MW", 
+    "Mali": "ML", "Mauritania": "MR", "Mauritius": "MU", "Mozambique": "MZ", "Namibia": "NA", 
+    "Niger": "NE", "Nigeria": "NG", "Rwanda": "RW", "Sao Tome and Principe": "ST", "Senegal": "SN", 
+    "Seychelles": "SC", "Sierra Leone": "SL", "Somalia": "SO", "South Africa": "ZA", 
+    "South Sudan": "SS", "Tanzania": "TZ", "Togo": "TG", "Uganda": "UG", "Zambia": "ZM", "Zimbabwe": "ZW",
+    
+    // North America
     "Canada": "CA", "United States": "US", "Mexico": "MX",
-    "Bahamas": "BS", "Barbados": "BB", "Belize": "BZ", "Costa Rica": "CR", "Cuba": "CU",
-    "Dominican Republic": "DO", "El Salvador": "SV", "Guatemala": "GT", "Honduras": "HN",
-    "Jamaica": "JM", "Nicaragua": "NI", "Panama": "PA", "Trinidad and Tobago": "TT",
+    
+    // Central America & Caribbean
+    "Antigua and Barbuda": "AG", "Bahamas": "BS", "Barbados": "BB", "Belize": "BZ", 
+    "Costa Rica": "CR", "Cuba": "CU", "Dominica": "DM", "Dominican Republic": "DO", 
+    "El Salvador": "SV", "Grenada": "GD", "Guatemala": "GT", "Haiti": "HT", "Honduras": "HN", 
+    "Jamaica": "JM", "Nicaragua": "NI", "Panama": "PA", "Saint Kitts and Nevis": "KN", 
+    "Saint Lucia": "LC", "Saint Vincent and the Grenadines": "VC", "Trinidad and Tobago": "TT",
+    
+    // South America
     "Argentina": "AR", "Bolivia": "BO", "Brazil": "BR", "Chile": "CL", "Colombia": "CO",
-    "Ecuador": "EC", "Paraguay": "PY", "Peru": "PE", "Uruguay": "UY", "Venezuela": "VE",
-    "Australia": "AU", "Fiji": "FJ", "Kiribati": "KI", "Micronesia": "FM", "Nauru": "NR",
-    "New Zealand": "NZ", "Palau": "PW", "Papua New Guinea": "PG", "Samoa": "WS",
-    "Solomon Islands": "SB", "Tonga": "TO", "Tuvalu": "TV", "Vanuatu": "VU"
+    "Ecuador": "EC", "Guyana": "GY", "Paraguay": "PY", "Peru": "PE", "Suriname": "SR", 
+    "Uruguay": "UY", "Venezuela": "VE",
+    
+    // Oceania
+    "Australia": "AU", "Fiji": "FJ", "Kiribati": "KI", "Marshall Islands": "MH", 
+    "Micronesia, Federated States of": "FM", "Nauru": "NR", "New Zealand": "NZ", "Palau": "PW", 
+    "Papua New Guinea": "PG", "Samoa": "WS", "Solomon Islands": "SB", "Tonga": "TO", 
+    "Tuvalu": "TV", "Vanuatu": "VU"
   };
 
   Object.values(countryZoneList).forEach(continentZones => {
@@ -258,13 +340,90 @@ export const getCountriesForZone = (continent: string, region: string): string[]
 // Get country codes for a preset zone
 export const getCountryCodesForZone = (continent: string, region: string): string[] => {
   const countries = getCountriesForZone(continent, region);
+  
+  // Use the same complete mapping from getAllCountries
   const countryCodeMap: Record<string, string> = {
-    // Same mapping as above - abbreviated for brevity
-    "United States": "US", "Canada": "CA", "Mexico": "MX", "United Kingdom": "GB",
-    "Germany": "DE", "France": "FR", "Italy": "IT", "Spain": "ES", "Netherlands": "NL",
-    "China": "CN", "Japan": "JP", "South Korea": "KR", "Singapore": "SG", "Australia": "AU",
-    // Add more as needed...
+    // Asia - East Asia
+    "China": "CN", "Hong Kong": "HK", "Japan": "JP", "Macau": "MO", "Mongolia": "MN", "South Korea": "KR", "Taiwan": "TW",
+    
+    // Asia - Southeast Asia
+    "Brunei": "BN", "Cambodia": "KH", "Indonesia": "ID", "Laos": "LA", "Malaysia": "MY", "Myanmar": "MM", 
+    "Philippines": "PH", "Singapore": "SG", "Thailand": "TH", "Timor-Leste": "TL", "Vietnam": "VN",
+    
+    // Asia - South Asia
+    "Afghanistan": "AF", "Bangladesh": "BD", "Bhutan": "BT", "India": "IN", "Maldives": "MV", 
+    "Nepal": "NP", "Pakistan": "PK", "Sri Lanka": "LK",
+    
+    // Asia - Central Asia
+    "Kazakhstan": "KZ", "Kyrgyzstan": "KG", "Tajikistan": "TJ", "Turkmenistan": "TM", "Uzbekistan": "UZ",
+    
+    // Asia - Western Asia (Middle East)
+    "Armenia": "AM", "Azerbaijan": "AZ", "Bahrain": "BH", "Cyprus": "CY", "Georgia": "GE",
+    "Iran": "IR", "Iraq": "IQ", "Israel": "IL", "Jordan": "JO", "Kuwait": "KW", "Lebanon": "LB",
+    "Oman": "OM", "Qatar": "QA", "Saudi Arabia": "SA", "Syria": "SY", "Turkey": "TR", 
+    "United Arab Emirates": "AE", "Yemen": "YE",
+    
+    // Europe - Western Europe
+    "Austria": "AT", "Belgium": "BE", "France": "FR", "Germany": "DE", "Liechtenstein": "LI",
+    "Luxembourg": "LU", "Monaco": "MC", "Netherlands": "NL", "Switzerland": "CH",
+    
+    // Europe - Northern Europe
+    "Denmark": "DK", "Estonia": "EE", "Finland": "FI", "Iceland": "IS", "Ireland": "IE",
+    "Latvia": "LV", "Lithuania": "LT", "Norway": "NO", "Sweden": "SE", "United Kingdom": "GB",
+    
+    // Europe - Southern Europe
+    "Albania": "AL", "Andorra": "AD", "Bosnia and Herzegovina": "BA", "Croatia": "HR", 
+    "Greece": "GR", "Italy": "IT", "Malta": "MT", "Montenegro": "ME", "North Macedonia": "MK",
+    "Portugal": "PT", "San Marino": "SM", "Serbia": "RS", "Slovenia": "SI", "Spain": "ES", 
+    "Vatican City": "VA",
+    
+    // Europe - Eastern Europe
+    "Belarus": "BY", "Bulgaria": "BG", "Czechia": "CZ", "Hungary": "HU", "Moldova": "MD",
+    "Poland": "PL", "Romania": "RO", "Russia": "RU", "Slovakia": "SK", "Ukraine": "UA",
+    
+    // Africa - North Africa
+    "Algeria": "DZ", "Egypt": "EG", "Libya": "LY", "Morocco": "MA", "Sudan": "SD", "Tunisia": "TN",
+    
+    // Africa - Sub-Saharan Africa
+    "Angola": "AO", "Benin": "BJ", "Botswana": "BW", "Burkina Faso": "BF", "Burundi": "BI", 
+    "Cabo Verde": "CV", "Cameroon": "CM", "Central African Republic": "CF", "Chad": "TD", 
+    "Comoros": "KM", "Congo": "CG", "Democratic Republic of the Congo": "CD", "Djibouti": "DJ", 
+    "Equatorial Guinea": "GQ", "Eritrea": "ER", "Eswatini": "SZ", "Ethiopia": "ET", "Gabon": "GA", 
+    "Gambia": "GM", "Ghana": "GH", "Guinea": "GN", "Guinea-Bissau": "GW", "Ivory Coast": "CI", 
+    "Kenya": "KE", "Lesotho": "LS", "Liberia": "LR", "Madagascar": "MG", "Malawi": "MW", 
+    "Mali": "ML", "Mauritania": "MR", "Mauritius": "MU", "Mozambique": "MZ", "Namibia": "NA", 
+    "Niger": "NE", "Nigeria": "NG", "Rwanda": "RW", "Sao Tome and Principe": "ST", "Senegal": "SN", 
+    "Seychelles": "SC", "Sierra Leone": "SL", "Somalia": "SO", "South Africa": "ZA", 
+    "South Sudan": "SS", "Tanzania": "TZ", "Togo": "TG", "Uganda": "UG", "Zambia": "ZM", "Zimbabwe": "ZW",
+    
+    // North America
+    "Canada": "CA", "United States": "US", "Mexico": "MX",
+    
+    // Central America & Caribbean
+    "Antigua and Barbuda": "AG", "Bahamas": "BS", "Barbados": "BB", "Belize": "BZ", 
+    "Costa Rica": "CR", "Cuba": "CU", "Dominica": "DM", "Dominican Republic": "DO", 
+    "El Salvador": "SV", "Grenada": "GD", "Guatemala": "GT", "Haiti": "HT", "Honduras": "HN", 
+    "Jamaica": "JM", "Nicaragua": "NI", "Panama": "PA", "Saint Kitts and Nevis": "KN", 
+    "Saint Lucia": "LC", "Saint Vincent and the Grenadines": "VC", "Trinidad and Tobago": "TT",
+    
+    // South America
+    "Argentina": "AR", "Bolivia": "BO", "Brazil": "BR", "Chile": "CL", "Colombia": "CO",
+    "Ecuador": "EC", "Guyana": "GY", "Paraguay": "PY", "Peru": "PE", "Suriname": "SR", 
+    "Uruguay": "UY", "Venezuela": "VE",
+    
+    // Oceania
+    "Australia": "AU", "Fiji": "FJ", "Kiribati": "KI", "Marshall Islands": "MH", 
+    "Micronesia, Federated States of": "FM", "Nauru": "NR", "New Zealand": "NZ", "Palau": "PW", 
+    "Papua New Guinea": "PG", "Samoa": "WS", "Solomon Islands": "SB", "Tonga": "TO", 
+    "Tuvalu": "TV", "Vanuatu": "VU"
   };
   
-  return countries.map(country => countryCodeMap[country] || country.substring(0, 2).toUpperCase());
+  return countries.map(country => {
+    const code = countryCodeMap[country];
+    if (!code) {
+      console.warn(`Missing country code for: ${country}`);
+      return country.substring(0, 2).toUpperCase();
+    }
+    return code;
+  });
 };

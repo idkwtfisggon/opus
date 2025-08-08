@@ -220,7 +220,7 @@ export const FEATURES_OVERVIEW = `
 - **Deployment Guide** - Production setup instructions
 `;
 
-export const QUICK_START_GUIDE = \`
+export const QUICK_START_GUIDE = `
 # Quick Start Guide
 
 ## Prerequisites
@@ -247,9 +247,9 @@ export const QUICK_START_GUIDE = \`
 - Modify color scheme in Tailwind config
 - Customize subscription plans in pricing route
 - Add new dashboard features in dashboard routes
-\`;
+`;
 
-export const ARCHITECTURE_NOTES = \`
+export const ARCHITECTURE_NOTES = `
 # Architecture Notes
 
 ## File Structure
@@ -269,7 +269,7 @@ export const ARCHITECTURE_NOTES = \`
 - Component lazy loading
 - Optimized bundle splitting
 - Efficient re-rendering patterns
-\`;
+`;
 
 // Export all documentation as a single object
 export const DOCUMENTATION = {

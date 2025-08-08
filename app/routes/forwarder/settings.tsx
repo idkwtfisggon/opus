@@ -4,7 +4,7 @@ import type { Route } from "./+types/settings";
 import { api } from "../../../convex/_generated/api";
 import { useMutation, useQuery } from "convex/react";
 import { useState, useEffect } from "react";
-import { countryZoneList, getCountryCodesForZone } from "../../utils/countryZones";
+import { countryZoneList, getCountryCodesForZone, getAllCountries } from "../../utils/countryZones";
 import ParcelLimitSettings from "../../components/settings/ParcelLimitSettings";
 import OperatingHoursSettings from "../../components/settings/OperatingHoursSettings";
 
@@ -41,60 +41,8 @@ export async function loader(args: Route.LoaderArgs) {
   }
 }
 
-// Complete list of countries with codes
-const ALL_COUNTRIES = [
-  { code: "AD", name: "Andorra" }, { code: "AE", name: "United Arab Emirates" }, { code: "AL", name: "Albania" }, 
-  { code: "AM", name: "Armenia" }, { code: "AO", name: "Angola" }, { code: "AR", name: "Argentina" }, 
-  { code: "AT", name: "Austria" }, { code: "AU", name: "Australia" }, { code: "AZ", name: "Azerbaijan" }, 
-  { code: "BA", name: "Bosnia and Herzegovina" }, { code: "BB", name: "Barbados" }, { code: "BD", name: "Bangladesh" }, 
-  { code: "BE", name: "Belgium" }, { code: "BH", name: "Bahrain" }, { code: "BN", name: "Brunei" }, 
-  { code: "BO", name: "Bolivia" }, { code: "BR", name: "Brazil" }, { code: "BS", name: "Bahamas" }, 
-  { code: "BT", name: "Bhutan" }, { code: "BW", name: "Botswana" }, { code: "BY", name: "Belarus" }, 
-  { code: "BZ", name: "Belize" }, { code: "CA", name: "Canada" }, { code: "CH", name: "Switzerland" }, 
-  { code: "CI", name: "Côte d'Ivoire" }, { code: "CL", name: "Chile" }, { code: "CM", name: "Cameroon" }, 
-  { code: "CN", name: "China" }, { code: "CO", name: "Colombia" }, { code: "CR", name: "Costa Rica" }, 
-  { code: "HR", name: "Croatia" }, { code: "CU", name: "Cuba" }, { code: "CY", name: "Cyprus" }, 
-  { code: "CZ", name: "Czech Republic" }, { code: "DE", name: "Germany" }, { code: "DK", name: "Denmark" }, 
-  { code: "DO", name: "Dominican Republic" }, { code: "DZ", name: "Algeria" }, { code: "EC", name: "Ecuador" }, 
-  { code: "EE", name: "Estonia" }, { code: "EG", name: "Egypt" }, { code: "ES", name: "Spain" }, 
-  { code: "ET", name: "Ethiopia" }, { code: "FI", name: "Finland" }, { code: "FJ", name: "Fiji" }, 
-  { code: "FM", name: "Micronesia" }, { code: "FR", name: "France" }, { code: "GB", name: "United Kingdom" }, 
-  { code: "GE", name: "Georgia" }, { code: "GH", name: "Ghana" }, { code: "GR", name: "Greece" }, 
-  { code: "GT", name: "Guatemala" }, { code: "HK", name: "Hong Kong" }, { code: "HN", name: "Honduras" }, 
-  { code: "HU", name: "Hungary" }, { code: "ID", name: "Indonesia" }, { code: "IE", name: "Ireland" }, 
-  { code: "IL", name: "Israel" }, { code: "IN", name: "India" }, { code: "IQ", name: "Iraq" }, 
-  { code: "IR", name: "Iran" }, { code: "IS", name: "Iceland" }, { code: "IT", name: "Italy" }, 
-  { code: "JM", name: "Jamaica" }, { code: "JO", name: "Jordan" }, { code: "JP", name: "Japan" }, 
-  { code: "KE", name: "Kenya" }, { code: "KG", name: "Kyrgyzstan" }, { code: "KI", name: "Kiribati" }, 
-  { code: "KR", name: "South Korea" }, { code: "KW", name: "Kuwait" }, { code: "KZ", name: "Kazakhstan" }, 
-  { code: "LB", name: "Lebanon" }, { code: "LI", name: "Liechtenstein" }, { code: "LK", name: "Sri Lanka" }, 
-  { code: "LT", name: "Lithuania" }, { code: "LU", name: "Luxembourg" }, { code: "LV", name: "Latvia" }, 
-  { code: "LY", name: "Libya" }, { code: "MA", name: "Morocco" }, { code: "MC", name: "Monaco" }, 
-  { code: "MD", name: "Moldova" }, { code: "ME", name: "Montenegro" }, { code: "MG", name: "Madagascar" }, 
-  { code: "MK", name: "North Macedonia" }, { code: "MM", name: "Myanmar" }, { code: "MN", name: "Mongolia" }, 
-  { code: "MT", name: "Malta" }, { code: "MV", name: "Maldives" }, { code: "MX", name: "Mexico" }, 
-  { code: "MY", name: "Malaysia" }, { code: "MZ", name: "Mozambique" }, { code: "NA", name: "Namibia" }, 
-  { code: "NG", name: "Nigeria" }, { code: "NI", name: "Nicaragua" }, { code: "NL", name: "Netherlands" }, 
-  { code: "NO", name: "Norway" }, { code: "NP", name: "Nepal" }, { code: "NR", name: "Nauru" }, 
-  { code: "NZ", name: "New Zealand" }, { code: "OM", name: "Oman" }, { code: "PA", name: "Panama" }, 
-  { code: "PE", name: "Peru" }, { code: "PG", name: "Papua New Guinea" }, { code: "PH", name: "Philippines" }, 
-  { code: "PK", name: "Pakistan" }, { code: "PL", name: "Poland" }, { code: "PS", name: "Palestine" }, 
-  { code: "PT", name: "Portugal" }, { code: "PW", name: "Palau" }, { code: "PY", name: "Paraguay" }, 
-  { code: "QA", name: "Qatar" }, { code: "RO", name: "Romania" }, { code: "RU", name: "Russia" }, 
-  { code: "RW", name: "Rwanda" }, { code: "SA", name: "Saudi Arabia" }, { code: "SB", name: "Solomon Islands" }, 
-  { code: "SD", name: "Sudan" }, { code: "SE", name: "Sweden" }, { code: "SG", name: "Singapore" }, 
-  { code: "SI", name: "Slovenia" }, { code: "SK", name: "Slovakia" }, { code: "SM", name: "San Marino" }, 
-  { code: "SN", name: "Senegal" }, { code: "RS", name: "Serbia" }, { code: "SV", name: "El Salvador" }, 
-  { code: "SY", name: "Syria" }, { code: "TH", name: "Thailand" }, { code: "TJ", name: "Tajikistan" }, 
-  { code: "TL", name: "Timor-Leste" }, { code: "TM", name: "Turkmenistan" }, { code: "TN", name: "Tunisia" }, 
-  { code: "TO", name: "Tonga" }, { code: "TR", name: "Turkey" }, { code: "TT", name: "Trinidad and Tobago" }, 
-  { code: "TV", name: "Tuvalu" }, { code: "TW", name: "Taiwan" }, { code: "TZ", name: "Tanzania" }, 
-  { code: "UA", name: "Ukraine" }, { code: "UG", name: "Uganda" }, { code: "US", name: "United States" }, 
-  { code: "UY", name: "Uruguay" }, { code: "UZ", name: "Uzbekistan" }, { code: "VA", name: "Vatican City" }, 
-  { code: "VE", name: "Venezuela" }, { code: "VN", name: "Vietnam" }, { code: "VU", name: "Vanuatu" }, 
-  { code: "WS", name: "Samoa" }, { code: "YE", name: "Yemen" }, { code: "ZA", name: "South Africa" }, 
-  { code: "ZM", name: "Zambia" }, { code: "ZW", name: "Zimbabwe" }
-].sort((a, b) => a.name.localeCompare(b.name));
+// Get complete list of countries from the centralized source
+const ALL_COUNTRIES = getAllCountries();
 
 const COURIERS = ["DHL", "UPS", "FedEx", "SF Express", "Aramex", "TNT"];
 
@@ -153,6 +101,7 @@ export default function ForwarderSettings({ loaderData }: Route.ComponentProps) 
   const [editingZone, setEditingZone] = useState<any>(null);
   const [editingRate, setEditingRate] = useState<any>(null);
   const [showPresetZones, setShowPresetZones] = useState(false);
+  const [countrySearchTerm, setCountrySearchTerm] = useState("");
 
   // Form states
   const [zoneForm, setZoneForm] = useState({
@@ -735,15 +684,20 @@ export default function ForwarderSettings({ loaderData }: Route.ComponentProps) 
                         <div className="p-3">
                           <input
                             type="text"
-                            placeholder="Search countries..."
+                            placeholder="Search countries by name or code (e.g. 'Brazil' or 'BR')..."
                             className="w-full px-3 py-2 text-sm border border-border rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary bg-background mb-3"
+                            value={countrySearchTerm}
                             onChange={(e) => {
-                              const searchTerm = e.target.value.toLowerCase();
-                              // Filter countries in real-time - you can implement this if needed
+                              setCountrySearchTerm(e.target.value);
                             }}
                           />
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 max-h-48 overflow-y-auto">
-                            {ALL_COUNTRIES.map(country => {
+                            {ALL_COUNTRIES.filter(country => {
+                              if (!countrySearchTerm.trim()) return true;
+                              const searchTerm = countrySearchTerm.toLowerCase();
+                              return country.name.toLowerCase().includes(searchTerm) || 
+                                     country.code.toLowerCase().includes(searchTerm);
+                            }).map(country => {
                               const conflicts = getCountryConflicts([country.code]);
                               const hasConflict = conflicts[country.code];
                               const isSelected = zoneForm.countries.includes(country.code);

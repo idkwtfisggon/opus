@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 
@@ -33,16 +33,9 @@ export default function OrderVolumeChart({ forwarderId }: OrderVolumeChartProps)
     );
   }
   
-  // Debug logging
-  console.log("Analytics data:", analytics);
-  console.log("Daily volume array:", analytics.dailyVolume);
-  console.log("Daily volume length:", analytics.dailyVolume?.length);
-  console.log("Total orders:", analytics.totalOrders);
-  console.log("Date range:", analytics.dateRange);
 
   // Safety checks
   if (!analytics.dailyVolume || analytics.dailyVolume.length === 0) {
-    console.log("No daily volume data available");
     return (
       <div className="bg-card border border-border rounded-xl p-6">
         <h2 className="text-xl font-semibold text-foreground mb-4">Order Volume</h2>
@@ -60,9 +53,6 @@ export default function OrderVolumeChart({ forwarderId }: OrderVolumeChartProps)
   // Use the backend-calculated average since account creation
   const avgCount = analytics.averageDailyOrdersSinceCreation || 0;
   
-  console.log("Max count:", maxCount, "Avg daily orders since creation:", avgCount);
-  console.log("Account creation date:", analytics.accountCreationDate);
-  console.log("Days with orders:", analytics.dailyVolume.filter(d => d.count > 0).map(d => `${d.date}: ${d.count}`));
   
   // Color coding based on volume relative to average (only considering active days)
   const getVolumeColor = (count: number) => {
@@ -194,10 +184,6 @@ export default function OrderVolumeChart({ forwarderId }: OrderVolumeChartProps)
             // Calculate pixel height (h-48 = 192px)
             const pixelHeight = day.count > 0 ? Math.max((heightPercentage / 100) * 192, 8) : 4;
             
-            // Debug individual bars
-            if (day.count > 0) {
-              console.log(`Bar ${day.date}: count=${day.count}, maxCount=${maxCount}, heightPct=${heightPercentage}%, pixelHeight=${pixelHeight}px, color=${getVolumeColor(day.count)}`);
-            }
             
             return (
               <div

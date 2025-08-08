@@ -126,7 +126,7 @@ export default function CreateTestOrders({ forwarderId, warehouseId }: CreateTes
       }
 
       alert(`Created ${ordersToCreate.length} test orders successfully!`);
-      window.location.reload(); // Refresh to see new data
+      // Convex will automatically update the UI via real-time subscriptions
     } catch (error) {
       console.error("Error creating test orders:", error);
       alert("Failed to create test orders: " + (error as Error).message);

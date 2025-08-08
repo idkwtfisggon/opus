@@ -64,7 +64,7 @@ export default function TimezoneSettings({
         timezone: newTimezone,
       });
       
-      window.location.reload(); // Refresh to see changes
+      // Convex will automatically update the UI via real-time subscriptions
     } catch (error) {
       console.error('Failed to update timezone:', error);
       alert('Failed to update timezone. Please try again.');
