@@ -56,6 +56,8 @@ export const upsertForwarder = mutation({
     contactEmail: v.string(),
     contactPhone: v.optional(v.string()),
     timezone: v.optional(v.string()),
+    maxParcelsPerMonth: v.optional(v.number()),
+    maxParcelWeight: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const existing = await ctx.db
@@ -82,5 +84,85 @@ export const upsertForwarder = mutation({
       });
       return forwarderId;
     }
+  },
+});
+
+// Update parcel limits for existing forwarder
+export const updateParcelLimits = mutation({
+  args: {
+    forwarderId: v.string(),
+    maxParcelsPerMonth: v.number(),
+    maxParcelWeight: v.number(),
+  },
+  handler: async (ctx, { forwarderId, maxParcelsPerMonth, maxParcelWeight }) => {
+    const forwarder = await ctx.db.get(forwarderId as any);
+    if (!forwarder) throw new Error("Forwarder not found");
+
+    await ctx.db.patch(forwarderId as any, {
+      maxParcelsPerMonth,
+      maxParcelWeight,
+      updatedAt: Date.now(),
+    });
+
+    return forwarderId;
+  },
+});
+
+// Update operating hours for existing forwarder
+export const updateOperatingHours = mutation({
+  args: {
+    forwarderId: v.string(),
+    operatingHours: v.optional(v.object({
+      monday: v.optional(v.object({ open: v.string(), close: v.string(), closed: v.optional(v.boolean()) })),
+      tuesday: v.optional(v.object({ open: v.string(), close: v.string(), closed: v.optional(v.boolean()) })),
+      wednesday: v.optional(v.object({ open: v.string(), close: v.string(), closed: v.optional(v.boolean()) })),
+      thursday: v.optional(v.object({ open: v.string(), close: v.string(), closed: v.optional(v.boolean()) })),
+      friday: v.optional(v.object({ open: v.string(), close: v.string(), closed: v.optional(v.boolean()) })),
+      saturday: v.optional(v.object({ open: v.string(), close: v.string(), closed: v.optional(v.boolean()) })),
+      sunday: v.optional(v.object({ open: v.string(), close: v.string(), closed: v.optional(v.boolean()) })),
+    })),
+    holidaySchedule: v.optional(v.array(v.object({
+      name: v.string(),
+      startDate: v.string(),
+      endDate: v.optional(v.string()),
+      type: v.union(v.literal("closed"), v.literal("modified_hours")),
+      modifiedHours: v.optional(v.object({
+        open: v.string(),
+        close: v.string(),
+      })),
+    }))),
+  },
+  handler: async (ctx, { forwarderId, operatingHours, holidaySchedule }) => {
+    const forwarder = await ctx.db.get(forwarderId as any);
+    if (!forwarder) throw new Error("Forwarder not found");
+
+    await ctx.db.patch(forwarderId as any, {
+      operatingHours,
+      holidaySchedule,
+      updatedAt: Date.now(),
+    });
+
+    return forwarderId;
+  },
+});
+
+// Update package restrictions for existing forwarder
+export const updatePackageRestrictions = mutation({
+  args: {
+    forwarderId: v.string(),
+    maxDimensions: v.optional(v.string()),
+    prohibitedItems: v.optional(v.array(v.string())),
+  },
+  handler: async (ctx, { forwarderId, maxDimensions, prohibitedItems }) => {
+    const forwarder = await ctx.db.get(forwarderId as any);
+    if (!forwarder) throw new Error("Forwarder not found");
+
+    await ctx.db.patch(forwarderId as any, {
+      maxDimensions,
+      prohibitedItems,
+      updatedAt: Date.now(),
+    });
+
+    return forwarderId;
   },
 });

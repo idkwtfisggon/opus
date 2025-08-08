@@ -5,6 +5,8 @@ import { api } from "../../../convex/_generated/api";
 import { useMutation, useQuery } from "convex/react";
 import { useState, useEffect } from "react";
 import { countryZoneList, getCountryCodesForZone } from "../../utils/countryZones";
+import ParcelLimitSettings from "../../components/settings/ParcelLimitSettings";
+import OperatingHoursSettings from "../../components/settings/OperatingHoursSettings";
 
 export async function loader(args: Route.LoaderArgs) {
   const { userId } = await getAuth(args);
@@ -228,6 +230,51 @@ export default function ForwarderSettings({ loaderData }: Route.ComponentProps) 
   const handleSaveZone = async () => {
     if (!forwarder || !zoneForm.zoneName || zoneForm.countries.length === 0) return;
     
+    // Check for duplicate zone names
+    const duplicateName = settings?.zones?.find(zone => 
+      zone.zoneName.toLowerCase() === zoneForm.zoneName.toLowerCase() &&
+      zone._id !== editingZone?._id
+    );
+    
+    if (duplicateName) {
+      alert(`A zone named "${zoneForm.zoneName}" already exists. Please choose a different name.`);
+      return;
+    }
+    
+    // Check for country conflicts
+    const conflictingCountries: string[] = [];
+    const conflictingZones: string[] = [];
+    
+    zoneForm.countries.forEach(country => {
+      const existingZone = settings?.zones?.find(zone => 
+        zone.countries.includes(country) && 
+        zone._id !== editingZone?._id
+      );
+      
+      if (existingZone) {
+        const countryName = ALL_COUNTRIES.find(c => c.code === country)?.name || country;
+        if (!conflictingCountries.includes(countryName)) {
+          conflictingCountries.push(countryName);
+        }
+        if (!conflictingZones.includes(existingZone.zoneName)) {
+          conflictingZones.push(existingZone.zoneName);
+        }
+      }
+    });
+    
+    if (conflictingCountries.length > 0) {
+      const countryList = conflictingCountries.join(', ');
+      const zoneList = conflictingZones.join(', ');
+      alert(
+        `Country conflict detected!\n\n` +
+        `The following countries are already assigned to other zones:\n` +
+        `Countries: ${countryList}\n` +
+        `Existing zones: ${zoneList}\n\n` +
+        `Please remove these countries from this zone or from the conflicting zones first.`
+      );
+      return;
+    }
+    
     try {
       await upsertZone({
         forwarderId: forwarder._id,
@@ -396,11 +443,48 @@ export default function ForwarderSettings({ loaderData }: Route.ComponentProps) 
     setIsAddingRate(true);
   };
 
+  // Check for conflicts in real-time
+  const getCountryConflicts = (countries: string[]) => {
+    const conflicts: { [country: string]: string } = {};
+    
+    countries.forEach(country => {
+      const existingZone = settings?.zones?.find(zone => 
+        zone.countries.includes(country) && 
+        zone._id !== editingZone?._id
+      );
+      
+      if (existingZone) {
+        conflicts[country] = existingZone.zoneName;
+      }
+    });
+    
+    return conflicts;
+  };
+
   const handleSelectPresetZone = async (continent: string, region: string) => {
     if (!forwarder) return;
     
     const countryCodes = getCountryCodesForZone(continent, region);
     const zoneName = region === continent ? continent : `${continent} - ${region}`;
+    
+    // Check for conflicts before creating preset zone
+    const conflicts = getCountryConflicts(countryCodes);
+    const conflictingCountries = Object.keys(conflicts);
+    
+    if (conflictingCountries.length > 0) {
+      const countryNames = conflictingCountries.map(code => 
+        ALL_COUNTRIES.find(c => c.code === code)?.name || code
+      ).join(', ');
+      const conflictingZones = [...new Set(Object.values(conflicts))].join(', ');
+      
+      alert(
+        `Cannot create "${zoneName}" zone due to conflicts!\n\n` +
+        `Countries already in other zones: ${countryNames}\n` +
+        `Conflicting zones: ${conflictingZones}\n\n` +
+        `Please modify or delete the conflicting zones first.`
+      );
+      return;
+    }
     
     try {
       await upsertZone({
@@ -436,6 +520,9 @@ export default function ForwarderSettings({ loaderData }: Route.ComponentProps) 
               { id: "zones", label: "Shipping Zones", count: settings?.zones?.length || 0 },
               { id: "rates", label: "Shipping Rates", count: settings?.rates?.length || 0 },
               { id: "consolidated", label: "Consolidated Shipping", badge: settings?.consolidatedSettings?.isEnabled ? "Enabled" : "Disabled" },
+              { id: "parcel-limits", label: "Parcel Limits", badge: forwarder.maxParcelsPerMonth ? `${forwarder.maxParcelsPerMonth}/mo` : "Not Set" },
+              { id: "operating-hours", label: "Operating Hours", badge: forwarder.operatingHours ? "Custom" : "24/7" },
+              { id: "misc-rates", label: "Misc Rates", badge: "Coming Soon" },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -583,6 +670,67 @@ export default function ForwarderSettings({ loaderData }: Route.ComponentProps) 
                       <label className="block text-sm font-medium text-foreground mb-2">
                         Countries ({zoneForm.countries.length} selected)
                       </label>
+                      
+                      {/* Conflict Summary */}
+                      {(() => {
+                        const conflicts = getCountryConflicts(zoneForm.countries);
+                        const conflictingCountries = Object.keys(conflicts);
+                        
+                        if (conflictingCountries.length > 0) {
+                          return (
+                            <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                              <div className="flex items-start gap-2">
+                                <div className="text-red-600 mt-0.5">⚠️</div>
+                                <div className="flex-1">
+                                  <h4 className="text-sm font-medium text-red-900">Country Conflicts Detected</h4>
+                                  <div className="text-xs text-red-700 mt-1 space-y-1">
+                                    {conflictingCountries.map(countryCode => {
+                                      const countryName = ALL_COUNTRIES.find(c => c.code === countryCode)?.name || countryCode;
+                                      const conflictZone = conflicts[countryCode];
+                                      const conflictingZoneObj = settings?.zones?.find(z => z.zoneName === conflictZone);
+                                      
+                                      return (
+                                        <div key={countryCode} className="flex items-center justify-between">
+                                          <span>• {countryName} is already in zone "{conflictZone}"</span>
+                                          <button
+                                            onClick={() => {
+                                              if (conflictingZoneObj) {
+                                                startEditingZone(conflictingZoneObj);
+                                              }
+                                            }}
+                                            className="text-xs bg-red-200 hover:bg-red-300 text-red-800 px-2 py-0.5 rounded ml-2 transition-colors"
+                                            title={`Edit "${conflictZone}" zone`}
+                                          >
+                                            Edit Zone
+                                          </button>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                  <div className="flex items-center justify-between mt-2">
+                                    <div className="text-xs text-red-600 font-medium">
+                                      Remove these countries or delete conflicting zones to proceed.
+                                    </div>
+                                    <button
+                                      onClick={() => {
+                                        // Remove conflicting countries from current form
+                                        setZoneForm(prev => ({
+                                          ...prev,
+                                          countries: prev.countries.filter(c => !conflictingCountries.includes(c))
+                                        }));
+                                      }}
+                                      className="text-xs bg-red-100 hover:bg-red-200 text-red-800 px-2 py-1 rounded transition-colors"
+                                    >
+                                      Remove Conflicting Countries
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
                       <div className="border border-border rounded-lg bg-background max-h-64 overflow-y-auto">
                         <div className="p-3">
                           <input
@@ -595,30 +743,51 @@ export default function ForwarderSettings({ loaderData }: Route.ComponentProps) 
                             }}
                           />
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 max-h-48 overflow-y-auto">
-                            {ALL_COUNTRIES.map(country => (
-                              <label key={country.code} className="flex items-center gap-2 p-2 hover:bg-muted/50 rounded cursor-pointer">
-                                <input
-                                  type="checkbox"
-                                  checked={zoneForm.countries.includes(country.code)}
-                                  onChange={(e) => {
-                                    if (e.target.checked) {
-                                      setZoneForm({ 
-                                        ...zoneForm, 
-                                        countries: [...zoneForm.countries, country.code] 
-                                      });
-                                    } else {
-                                      setZoneForm({ 
-                                        ...zoneForm, 
-                                        countries: zoneForm.countries.filter(c => c !== country.code) 
-                                      });
-                                    }
-                                  }}
-                                  className="rounded border-border"
-                                />
-                                <span className="text-sm">{country.name}</span>
-                                <span className="text-xs text-muted-foreground ml-auto">{country.code}</span>
-                              </label>
-                            ))}
+                            {ALL_COUNTRIES.map(country => {
+                              const conflicts = getCountryConflicts([country.code]);
+                              const hasConflict = conflicts[country.code];
+                              const isSelected = zoneForm.countries.includes(country.code);
+                              
+                              return (
+                                <label key={country.code} className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors ${
+                                  hasConflict 
+                                    ? 'hover:bg-red-50 bg-red-25' 
+                                    : 'hover:bg-muted/50'
+                                }`}>
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={(e) => {
+                                      if (e.target.checked) {
+                                        setZoneForm({ 
+                                          ...zoneForm, 
+                                          countries: [...zoneForm.countries, country.code] 
+                                        });
+                                      } else {
+                                        setZoneForm({ 
+                                          ...zoneForm, 
+                                          countries: zoneForm.countries.filter(c => c !== country.code) 
+                                        });
+                                      }
+                                    }}
+                                    className="rounded border-border"
+                                  />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2">
+                                      <span className={`text-sm ${hasConflict ? 'text-red-700' : ''}`}>
+                                        {country.name}
+                                      </span>
+                                      {hasConflict && (
+                                        <span className="text-xs bg-red-100 text-red-800 px-1 py-0.5 rounded">
+                                          ⚠️ In "{hasConflict}"
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <span className="text-xs text-muted-foreground ml-auto">{country.code}</span>
+                                </label>
+                              );
+                            })}
                           </div>
                         </div>
                       </div>
@@ -663,7 +832,11 @@ export default function ForwarderSettings({ loaderData }: Route.ComponentProps) 
                       </button>
                       <button
                         onClick={handleSaveZone}
-                        className="bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 font-medium text-sm transition-all"
+                        disabled={(() => {
+                          const conflicts = getCountryConflicts(zoneForm.countries);
+                          return Object.keys(conflicts).length > 0;
+                        })()}
+                        className="bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 font-medium text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         Save Zone
                       </button>
@@ -671,6 +844,116 @@ export default function ForwarderSettings({ loaderData }: Route.ComponentProps) 
                   </div>
                 </div>
               )}
+
+              {/* Country Usage Overview */}
+              <div className="bg-muted/30 border border-border rounded-xl p-4 mb-6">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-base font-medium text-foreground">Country Assignment Overview</h3>
+                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                    <span>{settings?.zones?.length || 0} zones</span>
+                    <span>
+                      {settings?.zones?.reduce((total, zone) => total + zone.countries.length, 0) || 0} countries assigned
+                    </span>
+                    <span>
+                      {ALL_COUNTRIES.length - (settings?.zones?.reduce((total, zone) => total + zone.countries.length, 0) || 0)} unassigned
+                    </span>
+                  </div>
+                </div>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Quick reference to see which countries are assigned to which zones. Use search to find specific countries instantly.
+                </p>
+                
+                <div className="max-h-48 overflow-y-auto">
+                  {settings?.zones && settings.zones.length > 0 ? (
+                    <div className="space-y-2">
+                      {settings.zones
+                        .sort((a, b) => a.zoneName.localeCompare(b.zoneName))
+                        .map((zone) => (
+                          <div key={zone._id} className="border border-border rounded-lg p-3 bg-background">
+                            <div className="flex items-center justify-between mb-2">
+                              <h4 className="font-medium text-foreground">{zone.zoneName}</h4>
+                              <span className="text-xs bg-muted px-2 py-1 rounded">
+                                {zone.countries.length} countries
+                              </span>
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                              {zone.countries
+                                .map(code => ALL_COUNTRIES.find(c => c.code === code)?.name || code)
+                                .sort()
+                                .map((countryName, index) => (
+                                  <span 
+                                    key={index}
+                                    className="text-xs bg-primary/10 text-primary px-2 py-1 rounded hover:bg-primary/20 transition-colors cursor-default"
+                                    title={`${countryName} is in ${zone.zoneName}`}
+                                  >
+                                    {countryName}
+                                  </span>
+                                ))
+                              }
+                            </div>
+                          </div>
+                        ))
+                      }
+                    </div>
+                  ) : (
+                    <div className="text-center py-4 text-muted-foreground text-sm">
+                      No zones configured yet. Countries will appear here once you create zones.
+                    </div>
+                  )}
+                </div>
+
+                {/* Quick Search */}
+                <div className="mt-4 border-t border-border pt-4">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Search for a country (e.g. 'Singapore', 'Japan')..."
+                      className="w-full px-3 py-2 text-sm border border-border rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary bg-background"
+                      onChange={(e) => {
+                        const searchTerm = e.target.value.toLowerCase();
+                        if (searchTerm.length > 2) {
+                          // Find which zone contains this country
+                          const foundZone = settings?.zones?.find(zone =>
+                            zone.countries.some(code => {
+                              const countryName = ALL_COUNTRIES.find(c => c.code === code)?.name || '';
+                              return countryName.toLowerCase().includes(searchTerm);
+                            })
+                          );
+                          
+                          if (foundZone) {
+                            const countryCode = foundZone.countries.find(code => {
+                              const countryName = ALL_COUNTRIES.find(c => c.code === code)?.name || '';
+                              return countryName.toLowerCase().includes(searchTerm);
+                            });
+                            const countryName = ALL_COUNTRIES.find(c => c.code === countryCode)?.name;
+                            
+                            // Show result inline
+                            const searchInput = e.target;
+                            searchInput.style.borderColor = '#10b981';
+                            searchInput.style.backgroundColor = '#f0fdf4';
+                            searchInput.title = `${countryName} is assigned to "${foundZone.zoneName}" zone`;
+                          } else {
+                            // No match found
+                            const searchInput = e.target;
+                            searchInput.style.borderColor = '#f59e0b';
+                            searchInput.style.backgroundColor = '#fffbeb';
+                            searchInput.title = 'Country not found in any zone or not available';
+                          }
+                        } else {
+                          // Reset styling
+                          const searchInput = e.target;
+                          searchInput.style.borderColor = '';
+                          searchInput.style.backgroundColor = '';
+                          searchInput.title = '';
+                        }
+                      }}
+                    />
+                    <div className="absolute right-3 top-2 text-xs text-muted-foreground">
+                      🔍
+                    </div>
+                  </div>
+                </div>
+              </div>
 
               {/* Zones List */}
               <div className="space-y-3">
@@ -1371,6 +1654,67 @@ export default function ForwarderSettings({ loaderData }: Route.ComponentProps) 
                 >
                   Save Consolidated Settings
                 </button>
+              </div>
+            </div>
+          )}
+
+          {/* Parcel Limits Tab */}
+          {activeTab === "parcel-limits" && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-lg font-semibold text-foreground">Parcel Limits</h2>
+                <p className="text-sm text-muted-foreground">Configure your monthly parcel capacity and weight limits</p>
+              </div>
+
+              <ParcelLimitSettings
+                forwarderId={forwarder._id}
+                currentMaxParcelsPerMonth={forwarder.maxParcelsPerMonth}
+                currentMaxParcelWeight={forwarder.maxParcelWeight}
+                currentMaxDimensions={forwarder.maxDimensions}
+                currentProhibitedItems={forwarder.prohibitedItems}
+                businessName={forwarder.businessName}
+              />
+            </div>
+          )}
+
+          {/* Operating Hours Tab */}
+          {activeTab === "operating-hours" && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-lg font-semibold text-foreground">Operating Hours</h2>
+                <p className="text-sm text-muted-foreground">Set your business hours and holiday schedule</p>
+              </div>
+
+              <OperatingHoursSettings
+                forwarderId={forwarder._id}
+                currentOperatingHours={forwarder.operatingHours}
+                currentHolidaySchedule={forwarder.holidaySchedule}
+                businessName={forwarder.businessName}
+              />
+            </div>
+          )}
+
+          {/* Misc Rates Tab */}
+          {activeTab === "misc-rates" && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-lg font-semibold text-foreground">Miscellaneous Rates</h2>
+                <p className="text-sm text-muted-foreground">Configure storage fees and specialized service rates</p>
+              </div>
+
+              <div className="bg-muted/30 border border-border rounded-xl p-8 text-center">
+                <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-foreground mb-2">Coming Soon</h3>
+                <p className="text-muted-foreground mb-4">
+                  Storage fees, rush processing, repackaging costs, and other specialized service rates will be available soon.
+                </p>
+                <div className="text-sm text-muted-foreground">
+                  Features planned: Storage fees, Rush processing, Repackaging, Failed delivery charges, Return processing
+                </div>
               </div>
             </div>
           )}

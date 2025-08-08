@@ -16,9 +16,15 @@
       "routes/pricing": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/success": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/subscription-required": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/print-label": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/dashboard/index": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/dashboard/chat": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
-      "routes/dashboard/settings": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0"
+      "routes/dashboard/settings": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/forwarder/index": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/forwarder/orders": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/forwarder/warehouses": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/forwarder/analytics": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/forwarder/settings": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0"
     },
     "routes": {
       "root": {
@@ -81,6 +87,15 @@
           "runtime": "nodejs"
         }
       },
+      "routes/print-label": {
+        "id": "routes/print-label",
+        "parentId": "root",
+        "file": "app/routes/print-label.tsx",
+        "path": "print-label",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
       "routes/dashboard/layout": {
         "id": "routes/dashboard/layout",
         "parentId": "root",
@@ -113,13 +128,64 @@
         "config": {
           "runtime": "nodejs"
         }
+      },
+      "routes/forwarder/layout": {
+        "id": "routes/forwarder/layout",
+        "parentId": "root",
+        "file": "app/routes/forwarder/layout.tsx",
+        "config": {}
+      },
+      "routes/forwarder/index": {
+        "id": "routes/forwarder/index",
+        "parentId": "routes/forwarder/layout",
+        "file": "app/routes/forwarder/index.tsx",
+        "path": "forwarder",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/forwarder/orders": {
+        "id": "routes/forwarder/orders",
+        "parentId": "routes/forwarder/layout",
+        "file": "app/routes/forwarder/orders.tsx",
+        "path": "forwarder/orders",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/forwarder/warehouses": {
+        "id": "routes/forwarder/warehouses",
+        "parentId": "routes/forwarder/layout",
+        "file": "app/routes/forwarder/warehouses.tsx",
+        "path": "forwarder/warehouses",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/forwarder/analytics": {
+        "id": "routes/forwarder/analytics",
+        "parentId": "routes/forwarder/layout",
+        "file": "app/routes/forwarder/analytics.tsx",
+        "path": "forwarder/analytics",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/forwarder/settings": {
+        "id": "routes/forwarder/settings",
+        "parentId": "routes/forwarder/layout",
+        "file": "app/routes/forwarder/settings.tsx",
+        "path": "forwarder/settings",
+        "config": {
+          "runtime": "nodejs"
+        }
       }
     }
   },
   "reactRouterConfig": {
-    "appDirectory": "/Users/michaelshimeles/Desktop/rsk/app",
+    "appDirectory": "/Users/benong/Desktop/Opus1/app",
     "basename": "/",
-    "buildDirectory": "/Users/michaelshimeles/Desktop/rsk/build",
+    "buildDirectory": "/Users/benong/Desktop/Opus1/build",
     "future": {
       "unstable_middleware": false,
       "unstable_optimizeDeps": false,
@@ -169,6 +235,12 @@
         "file": "routes/subscription-required.tsx",
         "path": "subscription-required"
       },
+      "routes/print-label": {
+        "id": "routes/print-label",
+        "parentId": "root",
+        "file": "routes/print-label.tsx",
+        "path": "print-label"
+      },
       "routes/dashboard/layout": {
         "id": "routes/dashboard/layout",
         "parentId": "root",
@@ -191,6 +263,41 @@
         "parentId": "routes/dashboard/layout",
         "file": "routes/dashboard/settings.tsx",
         "path": "dashboard/settings"
+      },
+      "routes/forwarder/layout": {
+        "id": "routes/forwarder/layout",
+        "parentId": "root",
+        "file": "routes/forwarder/layout.tsx"
+      },
+      "routes/forwarder/index": {
+        "id": "routes/forwarder/index",
+        "parentId": "routes/forwarder/layout",
+        "file": "routes/forwarder/index.tsx",
+        "path": "forwarder"
+      },
+      "routes/forwarder/orders": {
+        "id": "routes/forwarder/orders",
+        "parentId": "routes/forwarder/layout",
+        "file": "routes/forwarder/orders.tsx",
+        "path": "forwarder/orders"
+      },
+      "routes/forwarder/warehouses": {
+        "id": "routes/forwarder/warehouses",
+        "parentId": "routes/forwarder/layout",
+        "file": "routes/forwarder/warehouses.tsx",
+        "path": "forwarder/warehouses"
+      },
+      "routes/forwarder/analytics": {
+        "id": "routes/forwarder/analytics",
+        "parentId": "routes/forwarder/layout",
+        "file": "routes/forwarder/analytics.tsx",
+        "path": "forwarder/analytics"
+      },
+      "routes/forwarder/settings": {
+        "id": "routes/forwarder/settings",
+        "parentId": "routes/forwarder/layout",
+        "file": "routes/forwarder/settings.tsx",
+        "path": "forwarder/settings"
       }
     },
     "routeDiscovery": {

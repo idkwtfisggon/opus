@@ -57,12 +57,11 @@ export default function OrderVolumeChart({ forwarderId }: OrderVolumeChartProps)
   
   const maxCount = Math.max(...analytics.dailyVolume.map(d => d.count), 1);
   
-  // Calculate average since account setup (total orders / total days)
-  const totalOrders = analytics.dailyVolume.reduce((sum, d) => sum + d.count, 0);
-  const totalDays = analytics.dailyVolume.length;
-  const avgCount = totalDays > 0 ? totalOrders / totalDays : 0;
+  // Use the backend-calculated average since account creation
+  const avgCount = analytics.averageDailyOrdersSinceCreation || 0;
   
-  console.log("Max count:", maxCount, "Total orders:", totalOrders, "Total days:", totalDays, "Avg count:", avgCount);
+  console.log("Max count:", maxCount, "Avg daily orders since creation:", avgCount);
+  console.log("Account creation date:", analytics.accountCreationDate);
   console.log("Days with orders:", analytics.dailyVolume.filter(d => d.count > 0).map(d => `${d.date}: ${d.count}`));
   
   // Color coding based on volume relative to average (only considering active days)
@@ -232,7 +231,7 @@ export default function OrderVolumeChart({ forwarderId }: OrderVolumeChartProps)
                       <strong>{day.count}</strong> orders
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      Avg: {avgCount.toFixed(1)} orders/day
+                      Avg since creation: {avgCount.toFixed(1)} orders/day
                     </div>
                     {day.revenue > 0 && (
                       <div className="text-muted-foreground">
@@ -248,15 +247,27 @@ export default function OrderVolumeChart({ forwarderId }: OrderVolumeChartProps)
         
         {/* Date Labels */}
         <div className="flex justify-between mt-2 px-2">
-          {analytics.dailyVolume.map((day, index) => (
-            index % Math.ceil(analytics.dailyVolume.length / 7) === 0 ? (
-              <div key={`label-${day.date}`} className="text-xs text-muted-foreground">
-                {new Date(day.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-              </div>
-            ) : (
-              <div key={`spacer-${index}`} className="text-xs">&nbsp;</div>
-            )
-          ))}
+          {analytics.dailyVolume.map((day, index) => {
+            const shouldShowLabel = index % Math.ceil(analytics.dailyVolume.length / 7) === 0;
+            const isAccountCreationDate = analytics.accountCreationDate && day.date === analytics.accountCreationDate;
+            
+            if (shouldShowLabel || isAccountCreationDate) {
+              return (
+                <div 
+                  key={`label-${day.date}`} 
+                  className={`text-xs ${
+                    isAccountCreationDate 
+                      ? 'font-bold text-blue-600' 
+                      : 'text-muted-foreground'
+                  }`}
+                >
+                  {new Date(day.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                </div>
+              );
+            } else {
+              return <div key={`spacer-${index}`} className="text-xs">&nbsp;</div>;
+            }
+          })}
         </div>
       </div>
 

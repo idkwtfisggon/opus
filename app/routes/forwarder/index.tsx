@@ -103,7 +103,7 @@ export default function ForwarderDashboard({ loaderData }: Route.ComponentProps)
       </div>
       
       {/* Smart Alert Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <a href="/forwarder/orders?status=packed&labelPrinted=false" 
            className={`group block bg-card border border-border rounded-xl p-6 hover:shadow-md cursor-pointer transition-all duration-200 ${getAlertColor(stats.pendingLabels || 0)}`}>
           <div className="flex items-center justify-between mb-3">
@@ -135,17 +135,37 @@ export default function ForwarderDashboard({ loaderData }: Route.ComponentProps)
         <div className="bg-card border border-border rounded-xl p-6">
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-semibold text-lg text-foreground">
-              Capacity Used
+              Monthly Parcel Usage
             </h3>
             <div className="w-2 h-2 rounded-full bg-primary opacity-60"></div>
           </div>
           <p className="text-3xl font-bold text-primary mb-2">
-            {stats.capacityUsed}%
+            {stats.parcelLimitUsage}%
           </p>
           <p className="text-sm text-muted-foreground">
-            {stats.currentCapacity} of {stats.totalCapacity} slots
+            {stats.ordersThisMonth} of {stats.maxParcelsPerMonth} parcels this month
           </p>
+          <div className="mt-2 text-xs text-muted-foreground">
+            Warehouse: {stats.currentCapacity}/{stats.totalCapacity} slots ({stats.capacityUsed}%)
+          </div>
         </div>
+
+        {stats.maxParcelWeight && (
+          <div className="bg-card border border-border rounded-xl p-6">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-lg text-foreground">
+                Weight Limit
+              </h3>
+              <div className="w-2 h-2 rounded-full bg-orange-500 opacity-60"></div>
+            </div>
+            <p className="text-3xl font-bold text-orange-600 mb-2">
+              {stats.maxParcelWeight}kg
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Maximum parcel weight
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Quick Actions */}

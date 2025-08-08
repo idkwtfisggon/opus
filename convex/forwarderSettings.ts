@@ -46,6 +46,48 @@ export const upsertShippingZone = mutation({
     const { forwarderId, zoneId, zoneName, countries, isActive } = args;
     const now = Date.now();
     
+    // Get all existing zones for this forwarder
+    const existingZones = await ctx.db
+      .query("shippingZones")
+      .withIndex("by_forwarder", (q) => q.eq("forwarderId", forwarderId))
+      .collect();
+    
+    // Check for duplicate zone names
+    const duplicateName = existingZones.find(zone => 
+      zone.zoneName.toLowerCase() === zoneName.toLowerCase() &&
+      zone._id !== zoneId
+    );
+    
+    if (duplicateName) {
+      throw new Error(`A zone named "${zoneName}" already exists.`);
+    }
+    
+    // Check for country conflicts
+    const conflictingCountries: string[] = [];
+    const conflictingZones: string[] = [];
+    
+    countries.forEach(country => {
+      const existingZone = existingZones.find(zone => 
+        zone.countries.includes(country) && 
+        zone._id !== zoneId
+      );
+      
+      if (existingZone) {
+        if (!conflictingCountries.includes(country)) {
+          conflictingCountries.push(country);
+        }
+        if (!conflictingZones.includes(existingZone.zoneName)) {
+          conflictingZones.push(existingZone.zoneName);
+        }
+      }
+    });
+    
+    if (conflictingCountries.length > 0) {
+      throw new Error(
+        `Country conflict detected! Countries ${conflictingCountries.join(', ')} are already assigned to zones: ${conflictingZones.join(', ')}`
+      );
+    }
+    
     if (zoneId) {
       // Update existing zone
       await ctx.db.patch(zoneId as any, {

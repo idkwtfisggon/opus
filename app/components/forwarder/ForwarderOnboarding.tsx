@@ -72,16 +72,37 @@ export default function ForwarderOnboarding({ userId, onComplete }: ForwarderOnb
     maxWeightKg: 30
   });
   
-  // Auto-detect timezone on component mount
+  // Auto-detect timezone on component mount and when location changes
   useEffect(() => {
     try {
-      const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      setFormData(prev => ({ ...prev, timezone: detectedTimezone }));
+      const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      setFormData(prev => ({ ...prev, timezone: browserTimezone }));
     } catch (error) {
-      console.error('Failed to detect timezone:', error);
+      console.error('Failed to detect browser timezone:', error);
       setFormData(prev => ({ ...prev, timezone: 'UTC' }));
     }
   }, []);
+  
+  // Update timezone when location changes
+  useEffect(() => {
+    if (formData.country) {
+      import('../../../convex/utils/locationTimezone').then(({ getTimezoneWithFallback }) => {
+        const locationBasedTimezone = getTimezoneWithFallback(
+          formData.country,
+          formData.state,
+          formData.city,
+          formData.timezone // current browser timezone as fallback
+        );
+        
+        if (locationBasedTimezone !== formData.timezone) {
+          setFormData(prev => ({ ...prev, timezone: locationBasedTimezone }));
+          console.log(`Timezone updated based on location: ${formData.country}/${formData.state} -> ${locationBasedTimezone}`);
+        }
+      }).catch(error => {
+        console.error('Failed to load location timezone utilities:', error);
+      });
+    }
+  }, [formData.country, formData.state, formData.city]);
 
   const updateFormData = (field: keyof FormData, value: string | number) => {
     setFormData(prev => ({ ...prev, [field]: value }));

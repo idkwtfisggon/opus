@@ -20,6 +20,36 @@ export default defineSchema({
     contactEmail: v.string(),
     contactPhone: v.optional(v.string()),
     timezone: v.optional(v.string()), // User's timezone (e.g., "Asia/Singapore")
+    
+    // Parcel capacity limits
+    maxParcelsPerMonth: v.optional(v.number()), // Monthly parcel limit
+    maxParcelWeight: v.optional(v.number()), // Max weight per parcel (kg)
+    
+    // Package restrictions
+    maxDimensions: v.optional(v.string()), // Max dimensions "L x W x H" in cm
+    prohibitedItems: v.optional(v.array(v.string())), // List of prohibited item categories
+    
+    // Operating hours (if not set, assume fully operational 24/7)
+    operatingHours: v.optional(v.object({
+      monday: v.optional(v.object({ open: v.string(), close: v.string(), closed: v.optional(v.boolean()) })),
+      tuesday: v.optional(v.object({ open: v.string(), close: v.string(), closed: v.optional(v.boolean()) })),
+      wednesday: v.optional(v.object({ open: v.string(), close: v.string(), closed: v.optional(v.boolean()) })),
+      thursday: v.optional(v.object({ open: v.string(), close: v.string(), closed: v.optional(v.boolean()) })),
+      friday: v.optional(v.object({ open: v.string(), close: v.string(), closed: v.optional(v.boolean()) })),
+      saturday: v.optional(v.object({ open: v.string(), close: v.string(), closed: v.optional(v.boolean()) })),
+      sunday: v.optional(v.object({ open: v.string(), close: v.string(), closed: v.optional(v.boolean()) })),
+    })),
+    holidaySchedule: v.optional(v.array(v.object({
+      name: v.string(),
+      startDate: v.string(), // YYYY-MM-DD format
+      endDate: v.optional(v.string()), // YYYY-MM-DD format (for multi-day periods)
+      type: v.union(v.literal("closed"), v.literal("modified_hours")), // closed or modified hours
+      modifiedHours: v.optional(v.object({
+        open: v.string(), // HH:MM format
+        close: v.string(), // HH:MM format
+      })),
+    })))
+    
     isActive: v.boolean(),
     createdAt: v.number(),
     updatedAt: v.number(),

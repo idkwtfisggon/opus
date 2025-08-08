@@ -69,6 +69,14 @@ export const getForwarderStats = query({
       o.createdAt < twoDaysAgo
     ).length;
 
+    // Get forwarder profile for parcel limits
+    const forwarder = await ctx.db.get(forwarderId as any);
+    
+    // Calculate monthly parcel usage
+    const currentMonth = new Date();
+    const monthStart = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+    const ordersThisMonth = orders.filter(o => o.createdAt >= monthStart.getTime()).length;
+
     // Get warehouse capacity
     const warehouses = await ctx.db
       .query("warehouses")
@@ -79,6 +87,10 @@ export const getForwarderStats = query({
     const currentCapacity = warehouses.reduce((sum, w) => sum + w.currentCapacity, 0);
     const capacityUsed = totalCapacity > 0 ? Math.round((currentCapacity / totalCapacity) * 100) : 0;
 
+    // Monthly parcel limit usage
+    const maxParcelsPerMonth = forwarder?.maxParcelsPerMonth || 500; // Default fallback
+    const parcelLimitUsage = Math.round((ordersThisMonth / maxParcelsPerMonth) * 100);
+
     return {
       totalOrders: orders.length,
       pendingOrders,
@@ -87,7 +99,12 @@ export const getForwarderStats = query({
       staleOrders,
       capacityUsed,
       currentCapacity,
-      totalCapacity
+      totalCapacity,
+      // Monthly parcel limits
+      ordersThisMonth,
+      maxParcelsPerMonth,
+      parcelLimitUsage,
+      maxParcelWeight: forwarder?.maxParcelWeight
     };
   },
 });
