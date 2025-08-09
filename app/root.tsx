@@ -86,8 +86,8 @@ export default function App({ loaderData }: Route.ComponentProps) {
   return (
     <ClerkProvider
       loaderData={loaderData}
-      signUpFallbackRedirectUrl="/"
-      signInFallbackRedirectUrl="/"
+      signUpFallbackRedirectUrl="/onboarding"
+      signInFallbackRedirectUrl="/onboarding"
     >
       <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
         <Outlet />

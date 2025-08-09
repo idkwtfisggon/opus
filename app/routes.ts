@@ -7,6 +7,10 @@ import {
 
 export default [
   index("routes/home.tsx"),
+  route("signup", "routes/signup.tsx"),
+  route("onboarding", "routes/onboarding.tsx"),
+  route("onboarding/customer", "routes/onboarding/customer.tsx"),
+  route("onboarding/forwarder", "routes/onboarding/forwarder.tsx"),
   route("sign-in/*", "routes/sign-in.tsx"),
   route("sign-up/*", "routes/sign-up.tsx"),
   route("pricing", "routes/pricing.tsx"),
@@ -18,6 +22,13 @@ export default [
     route("dashboard/chat", "routes/dashboard/chat.tsx"),
     route("dashboard/settings", "routes/dashboard/settings.tsx"),
   ]),
+  // Customer dashboard
+  layout("routes/customer/layout.tsx", [
+    route("customer", "routes/customer/index.tsx"),
+    route("customer/orders", "routes/customer/orders.tsx"),
+    route("customer/account", "routes/customer/account.tsx"),
+    route("customer/settings", "routes/customer/settings.tsx"),
+  ]),
   // Forwarder dashboard
   layout("routes/forwarder/layout.tsx", [
     route("forwarder", "routes/forwarder/index.tsx"),
@@ -25,5 +36,6 @@ export default [
     route("forwarder/warehouses", "routes/forwarder/warehouses.tsx"),
     route("forwarder/analytics", "routes/forwarder/analytics.tsx"),
     route("forwarder/settings", "routes/forwarder/settings.tsx"),
+    route("forwarder/account", "routes/forwarder/account.tsx"),
   ]),
 ] satisfies RouteConfig;

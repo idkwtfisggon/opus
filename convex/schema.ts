@@ -9,9 +9,50 @@ export default defineSchema({
     image: v.optional(v.string()),
     tokenIdentifier: v.string(),
     role: v.union(v.literal("customer"), v.literal("forwarder"), v.literal("admin")),
+    
+    // Account settings
+    firstName: v.optional(v.string()),
+    lastName: v.optional(v.string()),
+    phoneNumber: v.optional(v.string()),
+    country: v.optional(v.string()),
+    timezone: v.optional(v.string()),
+    language: v.optional(v.string()), // "en", "es", "fr", etc.
+    avatar: v.optional(v.string()), // URL to profile picture
+    bio: v.optional(v.string()),
+    company: v.optional(v.string()),
+    jobTitle: v.optional(v.string()),
+    website: v.optional(v.string()),
+    
+    // Customer-specific shipping information
+    shippingAddress: v.optional(v.string()),
+    city: v.optional(v.string()),
+    state: v.optional(v.string()),
+    postalCode: v.optional(v.string()),
+    preferredCurrency: v.optional(v.string()),
+    
+    // Privacy settings
+    profileVisibility: v.optional(v.union(v.literal("public"), v.literal("private"))),
+    allowMarketing: v.optional(v.boolean()),
+    dataProcessingConsent: v.optional(v.boolean()),
+    
+    // Notification preferences
+    notificationSettings: v.optional(v.object({
+      emailNotifications: v.optional(v.boolean()),
+      orderStatusUpdates: v.optional(v.boolean()),
+      marketingEmails: v.optional(v.boolean()),
+      securityAlerts: v.optional(v.boolean()),
+    })),
+    
+    // Account status
+    isVerified: v.optional(v.boolean()),
+    twoFactorEnabled: v.optional(v.boolean()),
+    lastLoginAt: v.optional(v.number()),
+    
     createdAt: v.number(),
+    updatedAt: v.optional(v.number()),
   }).index("by_token", ["tokenIdentifier"])
-    .index("by_role", ["role"]),
+    .index("by_role", ["role"])
+    .index("by_email", ["email"]),
 
   // Forwarder profile and warehouse management
   forwarders: defineTable({
@@ -48,7 +89,7 @@ export default defineSchema({
         open: v.string(), // HH:MM format
         close: v.string(), // HH:MM format
       })),
-    })),
+    }))),
     
     isActive: v.boolean(),
     createdAt: v.number(),

@@ -16,7 +16,7 @@ const menuItems = [
 export const Navbar = ({
   loaderData,
 }: {
-  loaderData?: { isSignedIn: boolean; hasActiveSubscription: boolean };
+  loaderData?: { isSignedIn: boolean; hasActiveSubscription: boolean; user?: any };
 }) => {
   const [menuState, setMenuState] = React.useState(false);
   const [isScrolled, setIsScrolled] = React.useState(false);
@@ -44,12 +44,20 @@ export const Navbar = ({
 
   // Simple computations don't need useMemo
   const dashboardLink = !loaderData?.isSignedIn 
-    ? "/sign-up" 
-    : loaderData.hasActiveSubscription ? "/dashboard" : "/pricing";
+    ? "/signup" 
+    : loaderData.user?.role === "forwarder" 
+      ? "/forwarder"
+      : loaderData.user?.role === "customer"
+        ? "/customer"
+        : "/onboarding";
 
   const dashboardText = !loaderData?.isSignedIn 
-    ? "Get Started (Demo)"
-    : loaderData.hasActiveSubscription ? "Dashboard" : "Subscribe";
+    ? "Login"
+    : loaderData.user?.role === "forwarder"
+      ? "Forwarder Dashboard"
+      : loaderData.user?.role === "customer"
+        ? "Customer Dashboard"
+        : "Complete Setup";
   return (
     <header>
       <nav
@@ -149,8 +157,8 @@ export const Navbar = ({
                       size="sm"
                       className={cn(isScrolled && "lg:hidden")}
                     >
-                      <Link to="/sign-up" prefetch="viewport">
-                        <span>Sign Up</span>
+                      <Link to="/signup" prefetch="viewport">
+                        <span>Get Started</span>
                       </Link>
                     </Button>
                     <Button
@@ -158,8 +166,8 @@ export const Navbar = ({
                       size="sm"
                       className={cn(isScrolled ? "lg:inline-flex" : "hidden")}
                     >
-                      <Link to="/sign-up" prefetch="viewport">
-                        <span>{dashboardText}</span>
+                      <Link to="/signup" prefetch="viewport">
+                        <span>Get Started</span>
                       </Link>
                     </Button>
                   </>

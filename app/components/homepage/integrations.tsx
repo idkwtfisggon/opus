@@ -16,7 +16,7 @@ import { Navbar } from "./navbar";
 export default function IntegrationsSection({
   loaderData,
 }: {
-  loaderData?: { isSignedIn: boolean; hasActiveSubscription: boolean };
+  loaderData?: { isSignedIn: boolean; hasActiveSubscription: boolean; user?: any };
 }) {
   return (
     <section id="hero">
@@ -73,18 +73,22 @@ export default function IntegrationsSection({
                   <Link
                     to={
                       loaderData?.isSignedIn
-                        ? loaderData?.hasActiveSubscription
-                          ? "/dashboard"
-                          : "/pricing"
-                        : "/sign-up"
+                        ? loaderData?.user?.role === "forwarder"
+                          ? "/forwarder"
+                          : loaderData?.user?.role === "customer"
+                            ? "/customer"
+                            : "/onboarding"
+                        : "/signup"
                     }
                     prefetch="viewport"
                   >
                     {loaderData?.isSignedIn
-                      ? loaderData?.hasActiveSubscription
-                        ? "Go to Dashboard (Demo)"
-                        : "Subscribe Now (Demo)"
-                      : "Get Started (Demo)"}
+                      ? loaderData?.user?.role === "forwarder"
+                        ? "Go to Forwarder Dashboard"
+                        : loaderData?.user?.role === "customer"
+                          ? "Go to Customer Dashboard"
+                          : "Complete Setup"
+                      : "Get Started"}
                   </Link>
                 </Button>
                 <Button variant="outline" size="sm" asChild>

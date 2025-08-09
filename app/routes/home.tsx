@@ -1,5 +1,6 @@
 import { getAuth } from "@clerk/react-router/ssr.server";
 import { fetchAction, fetchQuery } from "convex/nextjs";
+import { redirect } from "react-router";
 import ContentSection from "~/components/homepage/content";
 import Footer from "~/components/homepage/footer";
 import Integrations from "~/components/homepage/integrations";
@@ -55,6 +56,27 @@ export function meta({}: Route.MetaArgs) {
 export async function loader(args: Route.LoaderArgs) {
   const { userId } = await getAuth(args);
 
+  let user = null;
+  let existingForwarder = null;
+  
+  if (userId) {
+    try {
+      // Check for user in users table first
+      user = await fetchQuery(api.users.findUserByToken, { tokenIdentifier: userId });
+      
+      // If no user record, check if they're an existing forwarder
+      if (!user) {
+        existingForwarder = await fetchQuery(api.forwarders.getForwarderByUserId, { userId });
+        if (existingForwarder) {
+          // Create a fake user object for the navbar
+          user = { role: "forwarder" };
+        }
+      }
+    } catch (error) {
+      console.error("Failed to fetch user data:", error);
+    }
+  }
+
   // Parallel data fetching to reduce waterfall
   // TODO: Uncomment when Polar is set up
   // const [subscriptionData, plans] = await Promise.all([
@@ -73,6 +95,7 @@ export async function loader(args: Route.LoaderArgs) {
     isSignedIn: !!userId,
     hasActiveSubscription: false, // subscriptionData?.hasActiveSubscription || false,
     plans: [], // plans,
+    user,
   };
 }
 

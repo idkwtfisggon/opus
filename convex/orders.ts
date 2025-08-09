@@ -87,8 +87,8 @@ export const getForwarderStats = query({
     const currentCapacity = warehouses.reduce((sum, w) => sum + w.currentCapacity, 0);
     const capacityUsed = totalCapacity > 0 ? Math.round((currentCapacity / totalCapacity) * 100) : 0;
 
-    // Monthly parcel limit usage
-    const maxParcelsPerMonth = forwarder?.maxParcelsPerMonth || 500; // Default fallback
+    // Monthly parcel limit usage (use default values for now)
+    const maxParcelsPerMonth = 500; // Default fallback
     const parcelLimitUsage = Math.round((ordersThisMonth / maxParcelsPerMonth) * 100);
 
     return {
@@ -104,7 +104,7 @@ export const getForwarderStats = query({
       ordersThisMonth,
       maxParcelsPerMonth,
       parcelLimitUsage,
-      maxParcelWeight: forwarder?.maxParcelWeight
+      maxParcelWeight: 50 // Default fallback
     };
   },
 });
