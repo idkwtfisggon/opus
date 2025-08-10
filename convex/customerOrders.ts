@@ -60,7 +60,7 @@ export const searchShippingOptions = query({
       });
 
       if (canServeOrigin) {
-        const warehouse = await ctx.db.get(serviceArea.warehouseId);
+        const warehouse = await ctx.db.get(serviceArea.warehouseId as any);
         if (warehouse) {
           const matchingCoverage = serviceArea.coverage.find(c => c.countryCode === args.fromCountryCode);
           eligibleWarehouses.push({
@@ -78,8 +78,8 @@ export const searchShippingOptions = query({
     for (const warehouseData of eligibleWarehouses) {
       const { warehouse, serviceArea } = warehouseData;
       
-      // Get forwarder details
-      const forwarder = await ctx.db.get(warehouse.forwarderId);
+      // Get forwarder details  
+      const forwarder = await ctx.db.get((warehouse as any).forwarderId);
       if (!forwarder) continue;
 
       // Find shipping zones for this forwarder that include the destination country
@@ -138,15 +138,15 @@ export const searchShippingOptions = query({
             warehouseId: warehouse._id,
             forwarder: {
               id: forwarder._id,
-              name: forwarder.businessName,
-              contactEmail: forwarder.contactEmail,
+              name: (forwarder as any).businessName || "Forwarder",
+              contactEmail: (forwarder as any).contactEmail || "",
             },
             warehouse: {
               id: warehouse._id,
-              name: warehouse.name,
-              city: warehouse.city,
-              state: warehouse.state,
-              country: warehouse.country,
+              name: (warehouse as any).name || "Warehouse",
+              city: (warehouse as any).city || "",
+              state: (warehouse as any).state || "",
+              country: (warehouse as any).country || "",
             },
             service: {
               name: rate.serviceName,

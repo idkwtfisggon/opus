@@ -216,7 +216,7 @@ export default defineSchema({
       v.literal("express"), 
       v.literal("overnight")
     ),
-    serviceName: v.string(), // Custom name: "Economy Saver", "Express Plus", etc.
+    serviceName: v.optional(v.string()), // Custom name: "Economy Saver", "Express Plus", etc.
     serviceDescription: v.optional(v.string()), // "Best value for non-urgent items"
     
     // Weight-based pricing slabs (array of weight ranges)
@@ -239,8 +239,8 @@ export default defineSchema({
     
     // Capacity and availability
     maxPackagesPerShipment: v.optional(v.number()),
-    currentCapacityUsed: v.number(), // Percentage 0-100
-    maxCapacity: v.number(), // Total packages this service can handle
+    currentCapacityUsed: v.optional(v.number()), // Percentage 0-100
+    maxCapacity: v.optional(v.number()), // Total packages this service can handle
     
     // Service-specific settings
     requiresSignature: v.optional(v.boolean()),
@@ -249,8 +249,8 @@ export default defineSchema({
     
     // Customer visibility
     isActive: v.boolean(),
-    isPublic: v.boolean(), // Whether customers can see this option
-    displayOrder: v.number(), // Order to show in customer interface
+    isPublic: v.optional(v.boolean()), // Whether customers can see this option
+    displayOrder: v.optional(v.number()), // Order to show in customer interface
     
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -421,8 +421,7 @@ export default defineSchema({
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index("by_warehouse", ["warehouseId"])
-    .index("by_country", ["coverage.country"]) // For quick country lookups
-    .index("by_active", ["warehouseId", "isActive"]),
+    .index("by_active", ["isActive"]),
 
   // Geographic reference data for consistent country/state naming
   geographicRegions: defineTable({

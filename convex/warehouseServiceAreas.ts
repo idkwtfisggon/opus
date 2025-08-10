@@ -65,7 +65,7 @@ export const updateWarehouseServiceArea = mutation({
     if (!identity) throw new Error("Not authenticated");
 
     // Verify warehouse belongs to this forwarder
-    const warehouse = await ctx.db.get(args.warehouseId);
+    const warehouse = await ctx.db.get(args.warehouseId as any);
     if (!warehouse) throw new Error("Warehouse not found");
 
     const forwarder = await ctx.db
@@ -73,7 +73,7 @@ export const updateWarehouseServiceArea = mutation({
       .withIndex("by_user", (q) => q.eq("userId", identity.subject))
       .unique();
 
-    if (!forwarder || warehouse.forwarderId !== forwarder._id) {
+    if (!forwarder || (warehouse as any).forwarderId !== forwarder._id) {
       throw new Error("Unauthorized");
     }
 
@@ -298,7 +298,7 @@ export const toggleServiceAreaStatus = mutation({
       .withIndex("by_user", (q) => q.eq("userId", identity.subject))
       .unique();
 
-    if (!forwarder || warehouse.forwarderId !== forwarder._id) {
+    if (!forwarder || (warehouse as any).forwarderId !== forwarder._id) {
       throw new Error("Unauthorized");
     }
 
