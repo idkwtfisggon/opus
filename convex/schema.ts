@@ -396,6 +396,50 @@ export default defineSchema({
     .index("by_forwarder", ["forwarderId"])
     .index("by_status", ["status"]),
 
+  // Warehouse service areas - defines which geographic areas each warehouse can serve
+  warehouseServiceAreas: defineTable({
+    warehouseId: v.string(), // Links to warehouses table
+    
+    // Geographic coverage definition
+    coverage: v.array(v.object({
+      country: v.string(), // "France", "Spain", etc.
+      countryCode: v.string(), // "FR", "ES", etc.
+      states: v.optional(v.array(v.string())), // ["Provence-Alpes-Côte d'Azur", "Catalonia"]
+      stateCodes: v.optional(v.array(v.string())), // ["PACA", "CAT"] for easier matching
+      isFullCountry: v.boolean(), // true = serves entire country, false = specific states only
+      priority: v.number(), // 1=primary service area, 2=secondary (affects sorting)
+    })),
+    
+    // Service parameters for this coverage
+    handlingTimeHours: v.number(), // How long to process packages from this area
+    additionalFees: v.optional(v.number()), // Extra cost for this service area
+    specialInstructions: v.optional(v.string()), // "Packages from rural areas may take longer"
+    
+    // Operational settings
+    isActive: v.boolean(),
+    maxPackagesPerDay: v.optional(v.number()), // Capacity limits for this area
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_warehouse", ["warehouseId"])
+    .index("by_country", ["coverage.country"]) // For quick country lookups
+    .index("by_active", ["warehouseId", "isActive"]),
+
+  // Geographic reference data for consistent country/state naming
+  geographicRegions: defineTable({
+    country: v.string(), // "France"
+    countryCode: v.string(), // "FR"
+    states: v.array(v.object({
+      name: v.string(), // "Provence-Alpes-Côte d'Azur"
+      code: v.string(), // "PACA"
+      majorCities: v.array(v.string()), // ["Marseille", "Nice", "Cannes"]
+    })),
+    isActive: v.boolean(), // Whether we support shipping to/from this country
+    continent: v.string(), // "Europe", "Asia", etc.
+    createdAt: v.number(),
+  }).index("by_country_code", ["countryCode"])
+    .index("by_continent", ["continent"])
+    .index("by_active", ["isActive"]),
+
   // Keep existing tables (commented for now)
   subscriptions: defineTable({
     userId: v.optional(v.string()),

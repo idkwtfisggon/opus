@@ -27,6 +27,7 @@ import type * as subscriptions from "../subscriptions.js";
 import type * as users from "../users.js";
 import type * as utils_locationTimezone from "../utils/locationTimezone.js";
 import type * as utils_timezone from "../utils/timezone.js";
+import type * as warehouseServiceAreas from "../warehouseServiceAreas.js";
 import type * as warehouses from "../warehouses.js";
 
 /**
@@ -52,6 +53,7 @@ declare const fullApi: ApiFromModules<{
   users: typeof users;
   "utils/locationTimezone": typeof utils_locationTimezone;
   "utils/timezone": typeof utils_timezone;
+  warehouseServiceAreas: typeof warehouseServiceAreas;
   warehouses: typeof warehouses;
 }>;
 export declare const api: FilterApi<

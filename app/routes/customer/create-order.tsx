@@ -30,6 +30,7 @@ export default function CreateOrderPage() {
   const [step, setStep] = useState<"package" | "search" | "select" | "confirm">("package");
   const [packageDetails, setPackageDetails] = useState({
     fromCountry: "US",
+    fromState: "",
     toCountry: "SG", 
     weight: "",
     declaredValue: "",
@@ -39,7 +40,8 @@ export default function CreateOrderPage() {
     category: "",
     dimensions: "",
     description: "",
-    specialInstructions: ""
+    specialInstructions: "",
+    sortBy: "distance" as "distance" | "price" | "speed"
   });
   const [selectedRate, setSelectedRate] = useState<any>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -47,14 +49,23 @@ export default function CreateOrderPage() {
   // Get all countries from your comprehensive list
   const allCountries = getAllCountries();
   
-  // Get real shipping options from Convex
+  // Helper function to get country code from country name
+  const getCountryCode = (countryName: string) => {
+    const country = allCountries.find(c => c.name === countryName);
+    return country?.code || countryName;
+  };
+  
+  // Get real shipping options from Convex with service area filtering
   const shippingOptions = useQuery(
     api.customerOrders.searchShippingOptions,
     step === "search" && packageDetails.weight ? {
       fromCountry: packageDetails.fromCountry,
+      fromCountryCode: getCountryCode(packageDetails.fromCountry),
+      fromState: packageDetails.fromState || undefined,
       toCountry: packageDetails.toCountry,
       weight: parseFloat(packageDetails.weight),
       declaredValue: parseFloat(packageDetails.declaredValue) || 0,
+      sortBy: packageDetails.sortBy,
     } : "skip"
   );
 
@@ -207,6 +218,44 @@ export default function CreateOrderPage() {
                     </option>
                   ))}
                 </select>
+              </div>
+
+              {/* State/Province selection for countries that support it */}
+              {(packageDetails.fromCountry === "US" || packageDetails.fromCountry === "FR" || packageDetails.fromCountry === "DE") && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    State/Province <span className="text-gray-500 font-normal">(Optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={packageDetails.fromState}
+                    onChange={(e) => setPackageDetails(prev => ({ ...prev, fromState: e.target.value }))}
+                    placeholder={packageDetails.fromCountry === "US" ? "California" : packageDetails.fromCountry === "FR" ? "Provence-Alpes-Côte d'Azur" : "Bavaria"}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    {packageDetails.fromCountry === "US" ? "State name (e.g., California, New York)" : 
+                     packageDetails.fromCountry === "FR" ? "Region name (e.g., Provence-Alpes-Côte d'Azur)" :
+                     "State name (e.g., Bavaria, Berlin)"}
+                  </p>
+                </div>
+              )}
+
+              {/* Sorting preference */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Sort Results By
+                </label>
+                <select
+                  value={packageDetails.sortBy}
+                  onChange={(e) => setPackageDetails(prev => ({ ...prev, sortBy: e.target.value as any }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                >
+                  <option value="distance">Proximity (Closest first)</option>
+                  <option value="price">Price (Cheapest first)</option>
+                  <option value="speed">Speed (Fastest first)</option>
+                </select>
+                <p className="text-xs text-gray-500 mt-1">How should we prioritize your shipping options?</p>
               </div>
 
               {/* Package Details */}
