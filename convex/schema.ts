@@ -204,14 +204,20 @@ export default defineSchema({
   shippingRates: defineTable({
     forwarderId: v.string(),
     zoneId: v.string(), // Links to shippingZones
-    courier: v.string(), // "DHL", "UPS", "FedEx", etc.
     
-    // Service types
+    // Courier and branding
+    courier: v.string(), // "DHL", "UPS", "FedEx", "Local Courier", etc.
+    courierLogo: v.optional(v.string()), // URL to courier logo
+    
+    // Service details
     serviceType: v.union(
+      v.literal("economy"), 
       v.literal("standard"), 
       v.literal("express"), 
       v.literal("overnight")
     ),
+    serviceName: v.string(), // Custom name: "Economy Saver", "Express Plus", etc.
+    serviceDescription: v.optional(v.string()), // "Best value for non-urgent items"
     
     // Weight-based pricing slabs (array of weight ranges)
     weightSlabs: v.array(v.object({
@@ -231,12 +237,21 @@ export default defineSchema({
     estimatedDaysMin: v.number(),
     estimatedDaysMax: v.number(),
     
+    // Capacity and availability
+    maxPackagesPerShipment: v.optional(v.number()),
+    currentCapacityUsed: v.number(), // Percentage 0-100
+    maxCapacity: v.number(), // Total packages this service can handle
+    
     // Service-specific settings
     requiresSignature: v.optional(v.boolean()),
     trackingIncluded: v.optional(v.boolean()),
     insuranceIncluded: v.optional(v.boolean()),
     
+    // Customer visibility
     isActive: v.boolean(),
+    isPublic: v.boolean(), // Whether customers can see this option
+    displayOrder: v.number(), // Order to show in customer interface
+    
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index("by_forwarder", ["forwarderId"])
@@ -245,7 +260,9 @@ export default defineSchema({
     .index("by_service", ["serviceType"])
     .index("by_zone_courier", ["zoneId", "courier"])
     .index("by_zone_service", ["zoneId", "serviceType"])
-    .index("by_active", ["forwarderId", "isActive"]),
+    .index("by_active", ["forwarderId", "isActive"])
+    .index("by_public", ["isPublic"])
+    .index("by_forwarder_public", ["forwarderId", "isPublic"]),
 
   // Consolidated shipping settings
   consolidatedShippingSettings: defineTable({
@@ -274,6 +291,110 @@ export default defineSchema({
     updatedAt: v.number(),
   }).index("by_forwarder", ["forwarderId"])
     .index("by_enabled", ["forwarderId", "isEnabled"]),
+
+  // Customer address book for multiple shipping addresses
+  customerAddresses: defineTable({
+    customerId: v.string(), // Links to users table
+    label: v.string(), // "Home", "Office", "Parents", etc.
+    recipientName: v.string(),
+    address: v.string(),
+    city: v.string(),
+    state: v.optional(v.string()),
+    country: v.string(),
+    postalCode: v.string(),
+    phoneNumber: v.optional(v.string()),
+    isDefault: v.boolean(),
+    isActive: v.boolean(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_customer", ["customerId"])
+    .index("by_customer_default", ["customerId", "isDefault"])
+    .index("by_customer_active", ["customerId", "isActive"]),
+
+  // Customer favorite forwarders
+  customerFavoriteForwarders: defineTable({
+    customerId: v.string(),
+    forwarderId: v.string(),
+    notes: v.optional(v.string()), // Why they like this forwarder
+    createdAt: v.number(),
+  }).index("by_customer", ["customerId"])
+    .index("by_forwarder", ["forwarderId"]),
+
+  // Customer notifications and alerts
+  customerNotifications: defineTable({
+    customerId: v.string(),
+    type: v.union(
+      v.literal("order_status_update"),
+      v.literal("delivery_scheduled"),
+      v.literal("package_arrived"),
+      v.literal("consolidation_ready"),
+      v.literal("general_announcement")
+    ),
+    title: v.string(),
+    message: v.string(),
+    orderId: v.optional(v.string()), // If related to specific order
+    isRead: v.boolean(),
+    createdAt: v.number(),
+    readAt: v.optional(v.number()),
+  }).index("by_customer", ["customerId"])
+    .index("by_customer_unread", ["customerId", "isRead"])
+    .index("by_order", ["orderId"]),
+
+  // Customer support tickets
+  supportTickets: defineTable({
+    customerId: v.string(),
+    subject: v.string(),
+    description: v.string(),
+    priority: v.union(v.literal("low"), v.literal("medium"), v.literal("high"), v.literal("urgent")),
+    status: v.union(
+      v.literal("open"),
+      v.literal("in_progress"), 
+      v.literal("waiting_customer"),
+      v.literal("resolved"),
+      v.literal("closed")
+    ),
+    category: v.union(
+      v.literal("tracking"),
+      v.literal("billing"),
+      v.literal("damage_claim"),
+      v.literal("general"),
+      v.literal("technical")
+    ),
+    orderId: v.optional(v.string()), // If related to specific order
+    assignedTo: v.optional(v.string()), // Support agent user ID
+    resolution: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    resolvedAt: v.optional(v.number()),
+  }).index("by_customer", ["customerId"])
+    .index("by_status", ["status"])
+    .index("by_priority", ["priority"])
+    .index("by_assigned", ["assignedTo"])
+    .index("by_order", ["orderId"]),
+
+  // Customer package consolidation requests
+  consolidationRequests: defineTable({
+    customerId: v.string(),
+    forwarderId: v.string(),
+    orderIds: v.array(v.string()), // Array of order IDs to consolidate
+    requestedShippingAddress: v.string(),
+    specialInstructions: v.optional(v.string()),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("processing"),
+      v.literal("ready"),
+      v.literal("shipped"),
+      v.literal("cancelled")
+    ),
+    estimatedCost: v.optional(v.number()),
+    finalCost: v.optional(v.number()),
+    consolidatedOrderId: v.optional(v.string()), // Created consolidated order
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    processedAt: v.optional(v.number()),
+  }).index("by_customer", ["customerId"])
+    .index("by_forwarder", ["forwarderId"])
+    .index("by_status", ["status"]),
 
   // Keep existing tables (commented for now)
   subscriptions: defineTable({

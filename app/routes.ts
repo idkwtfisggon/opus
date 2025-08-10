@@ -26,6 +26,7 @@ export default [
   layout("routes/customer/layout.tsx", [
     route("customer", "routes/customer/index.tsx"),
     route("customer/orders", "routes/customer/orders.tsx"),
+    route("customer/create-order", "routes/customer/create-order.tsx"),
     route("customer/account", "routes/customer/account.tsx"),
     route("customer/settings", "routes/customer/settings.tsx"),
   ]),
