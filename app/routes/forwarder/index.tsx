@@ -66,6 +66,20 @@ export default function ForwarderDashboard({ loaderData }: Route.ComponentProps)
     forwarder ? { forwarderId: forwarder._id } : "skip"
   );
   
+  // Get warehouse capacity data
+  const warehouseData = useQuery(
+    api.warehouseServiceAreas.getForwarderServiceAreas
+  );
+  
+  // Get current orders to calculate warehouse usage
+  const currentOrders = useQuery(
+    api.orders.getRecentOrders,
+    forwarder ? { 
+      forwarderId: forwarder._id,
+      limit: 1000 // Get all orders to calculate current capacity
+    } : "skip"
+  );
+  
   // Timezone fix mutation - use the existing upsertForwarder instead
   const updateForwarder = useMutation(api.forwarders.upsertForwarder);
   const [fixingTimezone, setFixingTimezone] = useState(false);
@@ -92,6 +106,35 @@ export default function ForwarderDashboard({ loaderData }: Route.ComponentProps)
       setFixingTimezone(false);
     }
   };
+  
+  // Calculate warehouse capacity usage
+  const getWarehouseCapacities = () => {
+    if (!warehouseData?.warehouses || !currentOrders) return [];
+    
+    return warehouseData.warehouses.map(warehouse => {
+      // Count active orders (not delivered) for this warehouse
+      const activeOrders = currentOrders.filter(order => 
+        order.warehouseId === warehouse._id && 
+        order.status !== 'delivered'
+      ).length;
+      
+      const maxCapacity = warehouse.maxParcels || 1000;
+      const usagePercentage = maxCapacity > 0 ? Math.round((activeOrders / maxCapacity) * 100) : 0;
+      
+      return {
+        id: warehouse._id,
+        name: warehouse.name,
+        city: warehouse.city,
+        state: warehouse.state,
+        current: activeOrders,
+        max: maxCapacity,
+        percentage: usagePercentage,
+        status: usagePercentage > 90 ? 'critical' : usagePercentage > 70 ? 'warning' : 'good'
+      };
+    });
+  };
+  
+  const warehouseCapacities = getWarehouseCapacities();
 
   if (showOnboarding) {
     return (
@@ -171,23 +214,6 @@ export default function ForwarderDashboard({ loaderData }: Route.ComponentProps)
           <p className="text-sm text-muted-foreground">&gt;48h old, no progress</p>
         </a>
 
-        <div className="bg-card border border-border rounded-xl p-6">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold text-lg text-foreground">
-              Monthly Parcel Usage
-            </h3>
-            <div className="w-2 h-2 rounded-full bg-primary opacity-60"></div>
-          </div>
-          <p className="text-3xl font-bold text-primary mb-2">
-            {stats.parcelLimitUsage}%
-          </p>
-          <p className="text-sm text-muted-foreground">
-            {stats.ordersThisMonth} of {stats.maxParcelsPerMonth} parcels this month
-          </p>
-          <div className="mt-2 text-xs text-muted-foreground">
-            Warehouse: {stats.currentCapacity}/{stats.totalCapacity} slots ({stats.capacityUsed}%)
-          </div>
-        </div>
 
         {stats.maxParcelWeight && (
           <div className="bg-card border border-border rounded-xl p-6">
@@ -203,6 +229,89 @@ export default function ForwarderDashboard({ loaderData }: Route.ComponentProps)
             <p className="text-sm text-muted-foreground">
               Maximum parcel weight
             </p>
+          </div>
+        )}
+      </div>
+
+      {/* Warehouse Capacity */}
+      <div className="bg-card border border-border rounded-xl p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="font-semibold text-lg text-foreground">
+            Warehouse Capacity
+          </h3>
+          <div className="w-2 h-2 rounded-full bg-blue-500 opacity-60"></div>
+        </div>
+        
+        {warehouseCapacities.length === 0 ? (
+          <div className="text-center py-8">
+            <div className="text-muted-foreground text-sm mb-2">
+              No warehouses configured
+            </div>
+            <a 
+              href="/forwarder/service-areas"
+              className="text-blue-600 hover:text-blue-700 text-sm underline"
+            >
+              Set up your first warehouse →
+            </a>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {warehouseCapacities.map((warehouse) => (
+              <div key={warehouse.id} className="text-center">
+                {/* Circular Progress */}
+                <div className="relative w-20 h-20 mx-auto mb-3">
+                  <svg className="w-20 h-20 transform -rotate-90" viewBox="0 0 36 36">
+                    {/* Background circle */}
+                    <path
+                      className="text-muted stroke-current"
+                      fill="none"
+                      strokeWidth="3"
+                      d="M18 2.0845
+                        a 15.9155 15.9155 0 0 1 0 31.831
+                        a 15.9155 15.9155 0 0 1 0 -31.831"
+                    />
+                    {/* Progress circle */}
+                    <path
+                      className={`stroke-current ${
+                        warehouse.status === 'critical' ? 'text-red-500' :
+                        warehouse.status === 'warning' ? 'text-yellow-500' :
+                        'text-green-500'
+                      }`}
+                      fill="none"
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                      strokeDasharray={`${warehouse.percentage}, 100`}
+                      d="M18 2.0845
+                        a 15.9155 15.9155 0 0 1 0 31.831
+                        a 15.9155 15.9155 0 0 1 0 -31.831"
+                    />
+                  </svg>
+                  {/* Percentage in center */}
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className={`text-sm font-bold ${
+                      warehouse.status === 'critical' ? 'text-red-600' :
+                      warehouse.status === 'warning' ? 'text-yellow-600' :
+                      'text-green-600'
+                    }`}>
+                      {warehouse.percentage}%
+                    </span>
+                  </div>
+                </div>
+                
+                {/* Warehouse info */}
+                <div>
+                  <div className="font-medium text-foreground text-sm mb-1 truncate">
+                    {warehouse.name}
+                  </div>
+                  <div className="text-xs text-muted-foreground mb-1">
+                    {warehouse.city}, {warehouse.state}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {warehouse.current}/{warehouse.max} slots
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
