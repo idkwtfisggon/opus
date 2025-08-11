@@ -166,3 +166,22 @@ export const updatePackageRestrictions = mutation({
     return forwarderId;
   },
 });
+
+// Update timezone for forwarder
+export const updateTimezone = mutation({
+  args: {
+    forwarderId: v.string(),
+    timezone: v.string(),
+  },
+  handler: async (ctx, { forwarderId, timezone }) => {
+    const forwarder = await ctx.db.get(forwarderId as any);
+    if (!forwarder) throw new Error("Forwarder not found");
+
+    await ctx.db.patch(forwarderId as any, {
+      timezone,
+      updatedAt: Date.now(),
+    });
+
+    return forwarderId;
+  },
+});

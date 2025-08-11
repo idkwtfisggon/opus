@@ -29,13 +29,6 @@ const navigation = [
     description: "Manage incoming packages"
   },
   { 
-    id: "warehouses", 
-    name: "Warehouses", 
-    href: "/forwarder/warehouses", 
-    icon: Warehouse,
-    description: "Manage locations & capacity"
-  },
-  { 
     id: "analytics", 
     name: "Analytics", 
     href: "/forwarder/analytics", 

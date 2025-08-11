@@ -4,6 +4,7 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { MapPin, Plus, Edit, Trash2, Globe, Clock, DollarSign, AlertCircle, Save, X } from "lucide-react";
 import { getAllCountries, getStatesForCountry, basicAddressShape, getCountryCode } from "../../utils/addressValidation";
+import WarehouseOperatingHours from "../../components/warehouse/WarehouseOperatingHours";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -12,27 +13,12 @@ export function meta({}: Route.MetaArgs) {
   ];
 }
 
-interface ServiceAreaFormData {
-  country: string;
-  countryCode: string;
-  states: string[];
-  stateCodes: string[];
-  isFullCountry: boolean;
-  priority: number;
-}
-
-interface WarehouseServiceAreaData {
-  warehouseId: string;
-  coverage: ServiceAreaFormData[];
-  handlingTimeHours: number;
-  additionalFees?: number;
-  specialInstructions?: string;
-  maxPackagesPerDay?: number;
-}
 
 export default function ForwarderServiceAreasPage() {
   const [editingWarehouse, setEditingWarehouse] = useState<string | null>(null);
-  const [serviceAreaData, setServiceAreaData] = useState<WarehouseServiceAreaData | null>(null);
+  const [editingWarehouseData, setEditingWarehouseData] = useState<any>(null);
+  const [editingOperatingHours, setEditingOperatingHours] = useState<any>(null);
+  const [editingHolidaySchedule, setEditingHolidaySchedule] = useState<any[]>([]);
   const [showCreateWarehouse, setShowCreateWarehouse] = useState(false);
   const [newWarehouse, setNewWarehouse] = useState({
     name: "",
@@ -55,6 +41,12 @@ export default function ForwarderServiceAreasPage() {
   // Get forwarder data with warehouses and service areas
   const forwarderData = useQuery(api.warehouseServiceAreas.getForwarderServiceAreas);
   
+  // Get shipping settings (zones and rates) for the forwarder
+  const shippingSettings = useQuery(
+    api.forwarderSettings.getForwarderSettings,
+    forwarderData?.forwarder ? { forwarderId: forwarderData.forwarder._id } : "skip"
+  );
+  
   // Get available countries and states using ISO codes
   const allCountries = getAllCountries();
   const availableStates = newWarehouse.countryCode ? getStatesForCountry(newWarehouse.countryCode) : [];
@@ -63,10 +55,21 @@ export default function ForwarderServiceAreasPage() {
   console.log('All countries:', allCountries.length, allCountries.slice(0, 5));
   
   // Mutations
-  const updateServiceArea = useMutation(api.warehouseServiceAreas.updateWarehouseServiceArea);
-  const toggleServiceAreaStatus = useMutation(api.warehouseServiceAreas.toggleServiceAreaStatus);
-  const seedRegions = useMutation(api.warehouseServiceAreas.seedGeographicRegions);
   const createWarehouse = useMutation(api.warehouses.createWarehouse);
+  const updateWarehouse = useMutation(api.warehouses.updateWarehouse);
+
+
+  // Helper function to get all shipping rates that apply to a specific warehouse
+  const getWarehouseRates = (warehouseId: string) => {
+    if (!shippingSettings?.rates) return [];
+    
+    return shippingSettings.rates.filter((rate: any) => {
+      // Rate applies if it's either:
+      // 1. A default rate (no warehouseId = applies to all warehouses)
+      // 2. A warehouse-specific rate that matches this warehouse
+      return rate.isActive && (!rate.warehouseId || rate.warehouseId === warehouseId);
+    });
+  };
 
   if (!forwarderData) {
     return (
@@ -93,103 +96,65 @@ export default function ForwarderServiceAreasPage() {
     const warehouse = forwarderData.warehouses.find(w => w._id === warehouseId);
     if (!warehouse) return;
 
-    const existingServiceArea = warehouse.serviceAreas[0]; // Assuming one service area per warehouse for now
-    
-    if (existingServiceArea) {
-      setServiceAreaData({
-        warehouseId,
-        coverage: existingServiceArea.coverage,
-        handlingTimeHours: existingServiceArea.handlingTimeHours,
-        additionalFees: existingServiceArea.additionalFees,
-        specialInstructions: existingServiceArea.specialInstructions,
-        maxPackagesPerDay: existingServiceArea.maxPackagesPerDay,
-        useCustomRates: existingServiceArea.useCustomRates || false,
-      });
-    } else {
-      setServiceAreaData({
-        warehouseId,
-        coverage: [],
-        handlingTimeHours: 24,
-        additionalFees: 0,
-        specialInstructions: "",
-        maxPackagesPerDay: 100,
-        useCustomRates: false,
-      });
-    }
+    // Set warehouse data for editing
+    setEditingWarehouseData({
+      name: warehouse.name,
+      address: warehouse.address,
+      city: warehouse.city,
+      state: warehouse.state,
+      country: warehouse.country,
+      postalCode: warehouse.postalCode,
+      maxParcels: warehouse.maxParcels || 1000,
+    });
+
+    // Set operating hours (default to regular office hours if not set)
+    setEditingOperatingHours(warehouse.operatingHours || {
+      monday: { open: "09:00", close: "17:00" },
+      tuesday: { open: "09:00", close: "17:00" },
+      wednesday: { open: "09:00", close: "17:00" },
+      thursday: { open: "09:00", close: "17:00" },
+      friday: { open: "09:00", close: "17:00" },
+      saturday: { closed: true },
+      sunday: { closed: true },
+    });
+
+    // Set holiday schedule
+    setEditingHolidaySchedule(warehouse.holidaySchedule || []);
     
     setEditingWarehouse(warehouseId);
   };
 
-  const handleSaveServiceArea = async () => {
-    if (!serviceAreaData) return;
+  const handleUpdateWarehouse = async () => {
+    if (!editingWarehouseData || !editingWarehouse) return;
 
     try {
-      await updateServiceArea({
-        warehouseId: serviceAreaData.warehouseId,
-        coverage: serviceAreaData.coverage,
-        handlingTimeHours: serviceAreaData.handlingTimeHours,
-        additionalFees: serviceAreaData.additionalFees,
-        specialInstructions: serviceAreaData.specialInstructions,
-        maxPackagesPerDay: serviceAreaData.maxPackagesPerDay,
-        useCustomRates: serviceAreaData.useCustomRates,
+      await updateWarehouse({
+        warehouseId: editingWarehouse,
+        name: editingWarehouseData.name,
+        address: editingWarehouseData.address,
+        city: editingWarehouseData.city,
+        state: editingWarehouseData.state,
+        country: editingWarehouseData.country,
+        postalCode: editingWarehouseData.postalCode,
+        maxParcels: editingWarehouseData.maxParcels,
+        operatingHours: editingOperatingHours,
+        holidaySchedule: editingHolidaySchedule,
       });
       
       setEditingWarehouse(null);
-      setServiceAreaData(null);
+      setEditingWarehouseData(null);
+      setEditingOperatingHours(null);
+      setEditingHolidaySchedule([]);
+      alert('Warehouse details updated successfully!');
     } catch (error) {
-      console.error("Error saving service area:", error);
-      alert("Failed to save service area. Please try again.");
+      console.error("Error updating warehouse:", error);
+      alert("Failed to update warehouse details. Please try again.");
     }
   };
 
-  const handleAddCoverage = () => {
-    if (!serviceAreaData) return;
-    
-    setServiceAreaData({
-      ...serviceAreaData,
-      coverage: [
-        ...serviceAreaData.coverage,
-        {
-          country: "",
-          countryCode: "",
-          states: [],
-          stateCodes: [],
-          isFullCountry: true,
-          priority: 1,
-        }
-      ]
-    });
-  };
-
-  const handleUpdateCoverage = (index: number, updates: Partial<ServiceAreaFormData>) => {
-    if (!serviceAreaData) return;
-    
-    const newCoverage = [...serviceAreaData.coverage];
-    newCoverage[index] = { ...newCoverage[index], ...updates };
-    
-    setServiceAreaData({
-      ...serviceAreaData,
-      coverage: newCoverage
-    });
-  };
-
-  const handleRemoveCoverage = (index: number) => {
-    if (!serviceAreaData) return;
-    
-    setServiceAreaData({
-      ...serviceAreaData,
-      coverage: serviceAreaData.coverage.filter((_, i) => i !== index)
-    });
-  };
-
-  const handleSeedRegions = async () => {
-    try {
-      await seedRegions();
-      alert("Geographic regions seeded successfully!");
-    } catch (error) {
-      console.error("Error seeding regions:", error);
-      alert("Failed to seed regions. They may already exist.");
-    }
+  const handleOperatingHoursChange = (operatingHours: any, holidaySchedule: any[]) => {
+    setEditingOperatingHours(operatingHours);
+    setEditingHolidaySchedule(holidaySchedule);
   };
 
   const handleCreateWarehouse = async () => {
@@ -266,7 +231,7 @@ export default function ForwarderServiceAreasPage() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 mb-2">Service Areas</h1>
-            <p className="text-gray-600">Configure which geographic areas your warehouses can serve</p>
+            <p className="text-gray-600">View your warehouses and their available shipping rates</p>
           </div>
           <div className="flex space-x-3">
             <button
@@ -276,12 +241,6 @@ export default function ForwarderServiceAreasPage() {
               <Plus className="h-4 w-4" />
               Add Warehouse
             </button>
-            <button
-              onClick={handleSeedRegions}
-              className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-medium transition-colors text-sm"
-            >
-              Seed Test Regions
-            </button>
           </div>
         </div>
 
@@ -290,10 +249,7 @@ export default function ForwarderServiceAreasPage() {
             <div className="flex items-center">
               <AlertCircle className="h-5 w-5 text-yellow-600 mr-2" />
               <p className="text-yellow-800">
-                You need to create warehouses first before configuring service areas.{" "}
-                <a href="/forwarder/warehouses" className="font-medium underline hover:no-underline">
-                  Go to Warehouses
-                </a>
+                Click "Add Warehouse" above to create your first warehouse location.
               </p>
             </div>
           </div>
@@ -303,8 +259,6 @@ export default function ForwarderServiceAreasPage() {
       {/* Warehouses List */}
       <div className="px-4 sm:px-0 space-y-6">
         {forwarderData.warehouses.map((warehouse) => {
-          const serviceArea = warehouse.serviceAreas[0];
-          const isActive = serviceArea?.isActive !== false;
           
           return (
             <div key={warehouse._id} className="bg-white rounded-lg shadow-sm border border-gray-200">
@@ -317,101 +271,96 @@ export default function ForwarderServiceAreasPage() {
                     </p>
                   </div>
                   <div className="flex items-center space-x-3">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      isActive ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-                    }`}>
-                      {isActive ? "Active" : "Inactive"}
-                    </span>
                     <button
                       onClick={() => handleEditServiceArea(warehouse._id)}
                       className="bg-blue-100 hover:bg-blue-200 text-blue-700 px-3 py-1 rounded-md text-sm font-medium transition-colors"
                     >
-                      {serviceArea ? "Edit" : "Configure"}
+                      Edit Warehouse
                     </button>
-                    {serviceArea && (
-                      <button
-                        onClick={() => toggleServiceAreaStatus({
-                          warehouseId: warehouse._id,
-                          isActive: !isActive
-                        })}
-                        className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
-                          isActive 
-                            ? "bg-red-100 hover:bg-red-200 text-red-700" 
-                            : "bg-green-100 hover:bg-green-200 text-green-700"
-                        }`}
-                      >
-                        {isActive ? "Deactivate" : "Activate"}
-                      </button>
-                    )}
                   </div>
                 </div>
               </div>
 
-              {serviceArea && (
-                <div className="px-6 py-4">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                    <div className="flex items-center text-sm text-gray-600">
-                      <Clock className="h-4 w-4 mr-2" />
-                      Processing: {serviceArea.handlingTimeHours}h
-                    </div>
-                    <div className="flex items-center text-sm text-gray-600">
-                      <DollarSign className="h-4 w-4 mr-2" />
-                      Extra Fee: ${serviceArea.additionalFees || 0}
-                    </div>
-                    <div className="flex items-center text-sm text-gray-600">
-                      <Globe className="h-4 w-4 mr-2" />
-                      Coverage: {serviceArea.coverage.length} area(s)
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <h4 className="text-sm font-medium text-gray-900">Coverage Areas:</h4>
-                    {serviceArea.coverage.map((coverage, index) => (
-                      <div key={index} className="bg-gray-50 rounded-md p-3">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <span className="font-medium">{coverage.country}</span>
-                            {coverage.isFullCountry ? (
-                              <span className="ml-2 text-sm text-green-600">(Full Country)</span>
-                            ) : (
-                              <span className="ml-2 text-sm text-blue-600">
-                                ({coverage.states?.length || 0} state(s))
-                              </span>
-                            )}
-                          </div>
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            coverage.priority === 1 
-                              ? "bg-blue-100 text-blue-800" 
-                              : "bg-gray-100 text-gray-800"
-                          }`}>
-                            {coverage.priority === 1 ? "Primary" : "Secondary"}
-                          </span>
-                        </div>
-                        {!coverage.isFullCountry && coverage.states && coverage.states.length > 0 && (
-                          <div className="mt-2 text-sm text-gray-600">
-                            States: {coverage.states.join(", ")}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                  
-                  {serviceArea.specialInstructions && (
-                    <div className="mt-4 p-3 bg-yellow-50 rounded-md">
-                      <h4 className="text-sm font-medium text-yellow-900">Special Instructions:</h4>
-                      <p className="text-sm text-yellow-800 mt-1">{serviceArea.specialInstructions}</p>
-                    </div>
-                  )}
-                </div>
-              )}
 
-              {!serviceArea && (
-                <div className="px-6 py-8 text-center text-gray-500">
-                  <MapPin className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                  <p className="text-lg font-medium">No Service Area Configured</p>
-                  <p className="text-sm">Configure which countries and regions this warehouse can serve</p>
-                </div>
-              )}
+              {/* Always show applicable shipping rates for this warehouse */}
+              <div className="px-6 py-4 border-t border-gray-100">
+                <h4 className="text-sm font-medium text-gray-900 mb-3">Available Shipping Rates</h4>
+                {(() => {
+                  const warehouseRates = getWarehouseRates(warehouse._id);
+                  
+                  if (warehouseRates.length === 0) {
+                    return (
+                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                        <div className="flex items-start gap-2">
+                          <AlertCircle className="w-4 h-4 text-yellow-600 mt-0.5 flex-shrink-0" />
+                          <div>
+                            <p className="text-sm text-yellow-800">
+                              No shipping rates configured for this warehouse.
+                            </p>
+                            <p className="text-xs text-yellow-700 mt-1">
+                              <a 
+                                href="/forwarder/settings" 
+                                className="underline hover:no-underline"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                Configure shipping rates in Settings →
+                              </a>
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {warehouseRates.map((rate: any) => {
+                        const zone = shippingSettings?.zones?.find((z: any) => z._id === rate.zoneId);
+                        const warehouseSpecific = rate.warehouseId ? 
+                          forwarderData.warehouses.find(w => w._id === rate.warehouseId)?.name : null;
+                        
+                        return (
+                          <div key={rate._id} className="bg-green-50 border border-green-200 rounded-lg p-3">
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="text-sm font-medium text-green-900 truncate">
+                                    {rate.courier} - {rate.serviceType}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-1 flex-wrap">
+                                  {warehouseSpecific && (
+                                    <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+                                      {warehouseSpecific}
+                                    </span>
+                                  )}
+                                  {!rate.warehouseId && (
+                                    <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full">
+                                      All Warehouses
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <span className="text-sm font-semibold text-green-900 ml-2">
+                                {rate.weightSlabs?.[0]?.flatRate 
+                                  ? `$${rate.weightSlabs[0].flatRate}` 
+                                  : rate.weightSlabs?.[0]?.ratePerKg 
+                                  ? `$${rate.weightSlabs[0].ratePerKg}/kg`
+                                  : 'Varies'}
+                              </span>
+                            </div>
+                            <div className="text-xs text-green-800">
+                              Zone: {zone?.name || 'Unknown'} • {rate.estimatedDaysMin}-{rate.estimatedDaysMax} days
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+              </div>
+
             </div>
           );
         })}
@@ -705,19 +654,21 @@ export default function ForwarderServiceAreasPage() {
         </div>
       )}
 
-      {/* Service Area Configuration Modal */}
-      {editingWarehouse && serviceAreaData && (
+      {/* Warehouse Edit Modal */}
+      {editingWarehouse && editingWarehouseData && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div className="px-6 py-4 border-b border-gray-200">
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-semibold text-gray-900">
-                  Configure Service Area - {forwarderData.warehouses.find(w => w._id === editingWarehouse)?.name}
+                  Edit Warehouse - {forwarderData.warehouses.find(w => w._id === editingWarehouse)?.name}
                 </h2>
                 <button
                   onClick={() => {
                     setEditingWarehouse(null);
-                    setServiceAreaData(null);
+                    setEditingWarehouseData(null);
+                    setEditingOperatingHours(null);
+                    setEditingHolidaySchedule([]);
                   }}
                   className="text-gray-400 hover:text-gray-600"
                 >
@@ -727,274 +678,133 @@ export default function ForwarderServiceAreasPage() {
             </div>
 
             <div className="px-6 py-4 space-y-6">
-              {/* Basic Settings */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Processing Time (hours)
-                  </label>
-                  <input
-                    type="number"
-                    value={serviceAreaData.handlingTimeHours}
-                    onChange={(e) => setServiceAreaData({
-                      ...serviceAreaData,
-                      handlingTimeHours: parseInt(e.target.value) || 24
-                    })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    min="1"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">Time needed to process packages from this area</p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Additional Fee ($)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={serviceAreaData.additionalFees || 0}
-                    onChange={(e) => setServiceAreaData({
-                      ...serviceAreaData,
-                      additionalFees: parseFloat(e.target.value) || 0
-                    })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    min="0"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">Extra charge for serving this area</p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Max Packages Per Day
-                  </label>
-                  <input
-                    type="number"
-                    value={serviceAreaData.maxPackagesPerDay || 100}
-                    onChange={(e) => setServiceAreaData({
-                      ...serviceAreaData,
-                      maxPackagesPerDay: parseInt(e.target.value) || 100
-                    })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    min="1"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Special Instructions
-                  </label>
-                  <input
-                    type="text"
-                    value={serviceAreaData.specialInstructions || ""}
-                    onChange={(e) => setServiceAreaData({
-                      ...serviceAreaData,
-                      specialInstructions: e.target.value
-                    })}
-                    placeholder="e.g., Rural areas may take longer"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                  />
-                </div>
-              </div>
-
-              {/* Rate Configuration */}
-              <div className="border-t border-gray-200 pt-6">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Shipping Rate Configuration</h3>
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <div className="flex items-start space-x-4">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-3 mb-3">
-                        <input
-                          type="radio"
-                          id="useDefaultRates"
-                          name="rateMode"
-                          checked={!serviceAreaData.useCustomRates}
-                          onChange={() => setServiceAreaData({
-                            ...serviceAreaData,
-                            useCustomRates: false
-                          })}
-                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-                        />
-                        <label htmlFor="useDefaultRates" className="text-sm font-medium text-gray-900">
-                          Use Forwarder Default Rates
-                        </label>
-                      </div>
-                      <p className="text-xs text-gray-600 ml-7">
-                        Apply the same shipping rates configured in Forwarder Settings across all shipping zones
-                      </p>
-                    </div>
+              {/* Basic Warehouse Details */}
+              <div className="border border-gray-200 rounded-lg p-4">
+                <h3 className="text-lg font-medium text-gray-900 mb-4">Warehouse Details</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Warehouse Name</label>
+                    <input
+                      type="text"
+                      value={editingWarehouseData.name}
+                      onChange={(e) => setEditingWarehouseData({
+                        ...editingWarehouseData,
+                        name: e.target.value
+                      })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
                   </div>
                   
-                  <div className="flex items-start space-x-4 mt-4">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-3 mb-3">
-                        <input
-                          type="radio"
-                          id="useCustomRates"
-                          name="rateMode"
-                          checked={serviceAreaData.useCustomRates}
-                          onChange={() => setServiceAreaData({
-                            ...serviceAreaData,
-                            useCustomRates: true
-                          })}
-                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-                        />
-                        <label htmlFor="useCustomRates" className="text-sm font-medium text-gray-900">
-                          Use Custom Rates for This Warehouse
-                        </label>
-                      </div>
-                      <p className="text-xs text-gray-600 ml-7">
-                        Set specific shipping rates for this warehouse location (overrides default rates)
-                      </p>
-                      {serviceAreaData.useCustomRates && (
-                        <div className="ml-7 mt-3 p-3 bg-blue-50 rounded-md">
-                          <p className="text-sm text-blue-800">
-                            <strong>Note:</strong> You'll need to configure custom rates for each shipping zone after saving this service area.
-                            Custom rates will override your forwarder default rates for this warehouse only.
-                          </p>
-                        </div>
-                      )}
-                    </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Max Parcels Capacity</label>
+                    <input
+                      type="number"
+                      value={editingWarehouseData.maxParcels}
+                      onChange={(e) => setEditingWarehouseData({
+                        ...editingWarehouseData,
+                        maxParcels: parseInt(e.target.value) || 1000
+                      })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      min="1"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Street Address</label>
+                    <input
+                      type="text"
+                      value={editingWarehouseData.address}
+                      onChange={(e) => setEditingWarehouseData({
+                        ...editingWarehouseData,
+                        address: e.target.value
+                      })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">City</label>
+                    <input
+                      type="text"
+                      value={editingWarehouseData.city}
+                      onChange={(e) => setEditingWarehouseData({
+                        ...editingWarehouseData,
+                        city: e.target.value
+                      })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">State/Province</label>
+                    <input
+                      type="text"
+                      value={editingWarehouseData.state}
+                      onChange={(e) => setEditingWarehouseData({
+                        ...editingWarehouseData,
+                        state: e.target.value
+                      })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Country</label>
+                    <input
+                      type="text"
+                      value={editingWarehouseData.country}
+                      onChange={(e) => setEditingWarehouseData({
+                        ...editingWarehouseData,
+                        country: e.target.value
+                      })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                  
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Postal Code</label>
+                    <input
+                      type="text"
+                      value={editingWarehouseData.postalCode}
+                      onChange={(e) => setEditingWarehouseData({
+                        ...editingWarehouseData,
+                        postalCode: e.target.value
+                      })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
                   </div>
                 </div>
               </div>
 
-              {/* Coverage Areas */}
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-medium text-gray-900">Coverage Areas</h3>
-                  <button
-                    onClick={handleAddCoverage}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-md text-sm font-medium transition-colors flex items-center gap-1"
-                  >
-                    <Plus className="h-4 w-4" />
-                    Add Area
-                  </button>
-                </div>
-
-                <div className="space-y-4">
-                  {serviceAreaData.coverage.map((coverage, index) => (
-                    <div key={index} className="border border-gray-200 rounded-lg p-4">
-                      <div className="flex items-center justify-between mb-4">
-                        <h4 className="font-medium text-gray-900">Coverage Area {index + 1}</h4>
-                        <button
-                          onClick={() => handleRemoveCoverage(index)}
-                          className="text-red-600 hover:text-red-700"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Country</label>
-                          <select
-                            value={coverage.country}
-                            onChange={(e) => {
-                              const selectedCountry = availableRegions.find(r => r.country === e.target.value);
-                              handleUpdateCoverage(index, {
-                                country: e.target.value,
-                                countryCode: selectedCountry?.countryCode || "",
-                                states: [],
-                                stateCodes: [],
-                                isFullCountry: true,
-                              });
-                            }}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                          >
-                            <option value="">Select Country</option>
-                            {availableRegions.map(region => (
-                              <option key={region.countryCode} value={region.country}>
-                                {region.country}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Coverage Type</label>
-                          <select
-                            value={coverage.isFullCountry ? "full" : "states"}
-                            onChange={(e) => handleUpdateCoverage(index, {
-                              isFullCountry: e.target.value === "full",
-                              states: e.target.value === "full" ? [] : coverage.states,
-                            })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                          >
-                            <option value="full">Full Country</option>
-                            <option value="states">Specific States/Regions</option>
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Priority</label>
-                          <select
-                            value={coverage.priority}
-                            onChange={(e) => handleUpdateCoverage(index, {
-                              priority: parseInt(e.target.value)
-                            })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                          >
-                            <option value={1}>Primary (Show First)</option>
-                            <option value={2}>Secondary</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      {!coverage.isFullCountry && coverage.country && (
-                        <div className="mt-4">
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            States/Regions (comma-separated)
-                          </label>
-                          <input
-                            type="text"
-                            value={coverage.states?.join(", ") || ""}
-                            onChange={(e) => {
-                              const stateNames = e.target.value.split(",").map(s => s.trim()).filter(Boolean);
-                              handleUpdateCoverage(index, {
-                                states: stateNames,
-                                stateCodes: stateNames, // Simplified for now
-                              });
-                            }}
-                            placeholder="e.g., California, New York, Texas"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                          />
-                          <p className="text-xs text-gray-500 mt-1">
-                            Enter state/region names separated by commas
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-
-                  {serviceAreaData.coverage.length === 0 && (
-                    <div className="text-center py-8 text-gray-500">
-                      <Globe className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                      <p>No coverage areas configured</p>
-                      <p className="text-sm">Add coverage areas to specify which regions this warehouse serves</p>
-                    </div>
-                  )}
-                </div>
-              </div>
+              {/* Operating Hours Component */}
+              {editingOperatingHours !== null && (
+                <WarehouseOperatingHours
+                  warehouseName={editingWarehouseData.name}
+                  currentOperatingHours={editingOperatingHours}
+                  currentHolidaySchedule={editingHolidaySchedule}
+                  onOperatingHoursChange={handleOperatingHoursChange}
+                />
+              )}
             </div>
 
             <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
               <button
                 onClick={() => {
                   setEditingWarehouse(null);
-                  setServiceAreaData(null);
+                  setEditingWarehouseData(null);
+                  setEditingOperatingHours(null);
+                  setEditingHolidaySchedule([]);
                 }}
                 className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-medium transition-colors"
               >
                 Cancel
               </button>
               <button
-                onClick={handleSaveServiceArea}
-                disabled={serviceAreaData.coverage.length === 0}
-                className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2"
+                onClick={handleUpdateWarehouse}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2"
               >
                 <Save className="h-4 w-4" />
-                Save Service Area
+                Update Warehouse
               </button>
             </div>
           </div>

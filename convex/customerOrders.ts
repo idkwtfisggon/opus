@@ -101,7 +101,7 @@ export const searchShippingOptions = query({
         if (serviceArea.useCustomRates) {
           // Use warehouse-specific rates
           rates = await ctx.db
-            .query("warehouseShippingRates")
+            .query("shippingRates")
             .withIndex("by_warehouse", (q) => q.eq("warehouseId", warehouse._id))
             .filter((q) => q.eq(q.field("isActive"), true))
             .collect();

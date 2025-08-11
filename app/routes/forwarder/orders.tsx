@@ -2,7 +2,7 @@ import { getAuth } from "@clerk/react-router/ssr.server";
 import { fetchQuery } from "convex/nextjs";
 import type { Route } from "./+types/orders";
 import { api } from "../../../convex/_generated/api";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { useState } from "react";
 
 export async function loader(args: Route.LoaderArgs) {
@@ -12,45 +12,55 @@ export async function loader(args: Route.LoaderArgs) {
     throw new Response("Unauthorized", { status: 401 });
   }
 
-  try {
-    // Get forwarder profile first
-    const forwarder = await fetchQuery(api.forwarders.getForwarderByUserId, { userId });
-    
-    if (!forwarder) {
-      throw new Response("Forwarder profile not found", { status: 404 });
-    }
-
-    // Get orders for this forwarder
-    const orders = await fetchQuery(api.orders.getForwarderOrders, { 
-      forwarderId: forwarder._id,
-      limit: 50 
-    });
-
-    // Get the first warehouse for this forwarder (needed for test orders)
-    const warehouses = await fetchQuery(api.warehouses.getForwarderWarehouses, { 
-      forwarderId: forwarder._id 
-    });
-
-    return {
-      forwarder,
-      orders,
-      firstWarehouse: warehouses[0] || null
-    };
-  } catch (error) {
-    console.error("Error loading orders:", error);
-    return { 
-      forwarder: null,
-      orders: [],
-      firstWarehouse: null
-    };
-  }
+  return { userId };
 }
 
 export default function ManageOrders({ loaderData }: Route.ComponentProps) {
-  const { orders, forwarder, firstWarehouse } = loaderData;
+  const { userId } = loaderData;
+  
+  // Get forwarder data with warehouses and service areas
+  const forwarderData = useQuery(api.warehouseServiceAreas.getForwarderServiceAreas);
+  
   const [isCreating, setIsCreating] = useState(false);
   const createOrder = useMutation(api.orders.createOrder);
   const updateOrderStatus = useMutation(api.orders.updateOrderStatus);
+  const splitOrderToWarehouse = useMutation(api.orders.splitOrderToWarehouse);
+  
+  // Get ALL orders for this forwarder using the same query as dashboard
+  const allOrders = useQuery(
+    api.orders.getRecentOrders,
+    forwarderData?.forwarder ? { 
+      forwarderId: forwarderData.forwarder._id,
+      limit: 1000 // Get all orders
+    } : "skip"
+  );
+
+  const forwarder = forwarderData?.forwarder;
+  const warehouses = forwarderData?.warehouses || [];
+  const firstWarehouse = warehouses[0] || null;
+  
+  // Convert to expected format and add warehouse details
+  const orderData = allOrders ? {
+    orders: allOrders.map(order => {
+      const warehouse = warehouses.find(w => w._id === order.warehouseId);
+      return {
+        ...order,
+        warehouse: warehouse ? {
+          _id: warehouse._id,
+          name: warehouse.name,
+          city: warehouse.city,
+          state: warehouse.state,
+          country: warehouse.country,
+        } : null,
+      };
+    }),
+    total: allOrders.length,
+    hasMore: false
+  } : null;
+  
+  // Debug logging
+  console.log("DEBUG - forwarderData:", forwarderData);
+  console.log("DEBUG - orderData:", orderData);
 
   // Filter and sort states
   const [searchQuery, setSearchQuery] = useState("");
@@ -60,12 +70,32 @@ export default function ManageOrders({ loaderData }: Route.ComponentProps) {
   const [shippingTypeFilter, setShippingTypeFilter] = useState("");
   const [dateRangeFilter, setDateRangeFilter] = useState("");
   const [quickFilter, setQuickFilter] = useState("");
+  const [warehouseFilter, setWarehouseFilter] = useState("");
+  
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
+  const [viewAll, setViewAll] = useState(false);
+  
+  // Split order states
+  const [splitModalOpen, setSplitModalOpen] = useState(false);
+  const [splitOrderId, setSplitOrderId] = useState<string | null>(null);
+  const [splitItems, setSplitItems] = useState([{ description: "", quantity: 1, weight: 0, value: 0 }]);
+  const [splitTargetWarehouse, setSplitTargetWarehouse] = useState("");
 
   const handleCreateTestOrder = async () => {
-    if (!forwarder || !firstWarehouse) {
-      alert("Need forwarder profile and warehouse to create test orders");
+    console.log("Debug - forwarder:", forwarder);
+    console.log("Debug - warehouses:", warehouses);
+    
+    if (warehouses.length === 0) {
+      console.error("No warehouses available");
+      alert("No warehouses available for test order creation");
       return;
     }
+    
+    // Pick a random warehouse from available warehouses
+    const randomWarehouse = warehouses[Math.floor(Math.random() * warehouses.length)];
+    console.log("Debug - randomWarehouse:", randomWarehouse);
 
     setIsCreating(true);
     try {
@@ -96,7 +126,7 @@ export default function ManageOrders({ loaderData }: Route.ComponentProps) {
         declaredWeight: Math.floor(Math.random() * 5) + 0.5, // 0.5 to 5.5 kg
         declaredValue: Math.floor(Math.random() * 200) + 50, // $50 to $250
         currency: "USD",
-        warehouseId: firstWarehouse._id,
+        warehouseId: randomWarehouse._id,
         forwarderId: forwarder._id,
         shippingType: randomShippingType,
         // Customer pre-assigns courier during order creation
@@ -134,7 +164,8 @@ export default function ManageOrders({ loaderData }: Route.ComponentProps) {
 
   // Filter and sort orders
   const getFilteredAndSortedOrders = () => {
-    let filtered = [...orders];
+    if (!orderData?.orders) return [];
+    let filtered = [...orderData.orders];
 
     // Apply search filter
     if (searchQuery.trim()) {
@@ -165,6 +196,11 @@ export default function ManageOrders({ loaderData }: Route.ComponentProps) {
     // Apply shipping type filter
     if (shippingTypeFilter) {
       filtered = filtered.filter(order => order.shippingType === shippingTypeFilter);
+    }
+
+    // Apply warehouse filter
+    if (warehouseFilter) {
+      filtered = filtered.filter(order => order.warehouseId === warehouseFilter);
     }
 
     // Apply date range filter
@@ -218,6 +254,13 @@ export default function ManageOrders({ loaderData }: Route.ComponentProps) {
   };
 
   const filteredOrders = getFilteredAndSortedOrders();
+  
+  // Implement pagination on filtered orders
+  const totalFilteredOrders = filteredOrders.length;
+  const startIndex = viewAll ? 0 : (currentPage - 1) * itemsPerPage;
+  const endIndex = viewAll ? totalFilteredOrders : startIndex + itemsPerPage;
+  const paginatedOrders = filteredOrders.slice(startIndex, endIndex);
+  const totalPages = Math.ceil(totalFilteredOrders / itemsPerPage);
 
   // Clear all filters
   const clearAllFilters = () => {
@@ -228,10 +271,43 @@ export default function ManageOrders({ loaderData }: Route.ComponentProps) {
     setShippingTypeFilter("");
     setDateRangeFilter("");
     setQuickFilter("");
+    setWarehouseFilter("");
+  };
+
+  // Handle split order
+  const handleSplitOrder = async () => {
+    if (!splitOrderId || !splitTargetWarehouse || !forwarder) return;
+
+    try {
+      await splitOrderToWarehouse({
+        orderId: splitOrderId,
+        targetWarehouseId: splitTargetWarehouse,
+        items: splitItems,
+        updatedBy: forwarder._id,
+        notes: "Order split via dashboard",
+      });
+
+      // Close modal and reset state
+      setSplitModalOpen(false);
+      setSplitOrderId(null);
+      setSplitItems([{ description: "", quantity: 1, weight: 0, value: 0 }]);
+      setSplitTargetWarehouse("");
+      
+      // Refresh page
+      window.location.reload();
+    } catch (error) {
+      console.error("Error splitting order:", error);
+      alert("Failed to split order");
+    }
+  };
+
+  const openSplitModal = (orderId: string) => {
+    setSplitOrderId(orderId);
+    setSplitModalOpen(true);
   };
 
   // Get unique couriers for filter dropdown
-  const availableCouriers = [...new Set(orders.filter(order => order.courier).map(order => order.courier))];
+  const availableCouriers = [...new Set(orderData?.orders?.filter(order => order.courier).map(order => order.courier) || [])];
 
   // Active filters count  
   const activeFiltersCount = [
@@ -240,8 +316,29 @@ export default function ManageOrders({ loaderData }: Route.ComponentProps) {
     courierFilter,
     shippingTypeFilter,
     dateRangeFilter,
-    quickFilter
+    quickFilter,
+    warehouseFilter
   ].filter(Boolean).length + (sortBy !== "date-desc" ? 1 : 0);
+
+  // Show loading state while data is being fetched
+  if (!forwarderData) {
+    return (
+      <div className="space-y-6 p-6">
+        <div className="animate-pulse">
+          <div className="h-8 bg-gray-200 rounded w-1/4 mb-2"></div>
+          <div className="h-4 bg-gray-200 rounded w-1/2 mb-6"></div>
+          <div className="space-y-4">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+                <div className="h-8 bg-gray-200 rounded mb-4"></div>
+                <div className="h-6 bg-gray-200 rounded w-3/4"></div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 p-6">
@@ -255,7 +352,7 @@ export default function ManageOrders({ loaderData }: Route.ComponentProps) {
         </div>
         <button 
           onClick={handleCreateTestOrder}
-          disabled={isCreating || !forwarder || !firstWarehouse}
+          disabled={isCreating}
           className="bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 font-medium shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
         >
           {isCreating ? (
@@ -316,7 +413,7 @@ export default function ManageOrders({ loaderData }: Route.ComponentProps) {
           </div>
 
           {/* Search and Filters Row */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-3">
             {/* Search */}
             <div className="xl:col-span-2">
               <input
@@ -381,6 +478,20 @@ export default function ManageOrders({ loaderData }: Route.ComponentProps) {
               <option value="immediate">Immediate</option>
               <option value="consolidated">Consolidated</option>
             </select>
+
+            {/* Warehouse Filter */}
+            <select
+              value={warehouseFilter}
+              onChange={(e) => setWarehouseFilter(e.target.value)}
+              className="px-3 py-2 text-sm border border-border rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary bg-background"
+            >
+              <option value="">All Warehouses</option>
+              {warehouses.map(warehouse => (
+                <option key={warehouse._id} value={warehouse._id}>
+                  {warehouse.name} ({warehouse.city})
+                </option>
+              ))}
+            </select>
           </div>
 
           {/* Date Range Filter */}
@@ -408,10 +519,10 @@ export default function ManageOrders({ loaderData }: Route.ComponentProps) {
             <h2 className="text-lg font-semibold text-foreground">Orders</h2>
             <div className="flex items-center gap-4 text-sm text-muted-foreground">
               <span>
-                Showing: <span className="font-medium text-foreground">{filteredOrders.length}</span>
+                Showing: <span className="font-medium text-foreground">{paginatedOrders.length}</span>
               </span>
               <span>
-                Total: <span className="font-medium text-foreground">{orders.length}</span>
+                Total: <span className="font-medium text-foreground">{totalFilteredOrders}</span>
               </span>
             </div>
           </div>
@@ -426,6 +537,7 @@ export default function ManageOrders({ loaderData }: Route.ComponentProps) {
                 <th className="text-left p-4 text-sm font-medium text-muted-foreground">Customer Name</th>
                 <th className="text-left p-4 text-sm font-medium text-muted-foreground">Customer ID</th>
                 <th className="text-left p-4 text-sm font-medium text-muted-foreground">Tracking ID</th>
+                <th className="text-left p-4 text-sm font-medium text-muted-foreground">Warehouse</th>
                 <th className="text-left p-4 text-sm font-medium text-muted-foreground">Shipping Type</th>
                 <th className="text-left p-4 text-sm font-medium text-muted-foreground">Status</th>
                 <th className="text-left p-4 text-sm font-medium text-muted-foreground">Courier</th>
@@ -433,17 +545,17 @@ export default function ManageOrders({ loaderData }: Route.ComponentProps) {
               </tr>
             </thead>
             <tbody>
-              {filteredOrders.length === 0 ? (
+              {paginatedOrders.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="text-center p-8 text-muted-foreground">
-                    {orders.length === 0 
+                  <td colSpan={10} className="text-center p-8 text-muted-foreground">
+                    {!orderData?.orders || orderData.orders.length === 0 
                       ? "No orders found. Orders will appear here once you start receiving them."
                       : "No orders match your current filters. Try adjusting your search criteria."
                     }
                   </td>
                 </tr>
               ) : (
-                filteredOrders.map((order) => (
+                paginatedOrders.map((order) => (
                   <tr key={order._id} className="border-t border-border hover:bg-muted/25">
                     <td className="p-4 text-sm font-medium text-foreground">
                       {order._id.slice(-8).toUpperCase()}
@@ -459,6 +571,16 @@ export default function ManageOrders({ loaderData }: Route.ComponentProps) {
                     </td>
                     <td className="p-4 text-sm font-mono text-foreground">
                       {order.trackingNumber}
+                    </td>
+                    <td className="p-4 text-sm text-muted-foreground">
+                      {order.warehouse ? (
+                        <div className="flex flex-col">
+                          <span className="font-medium text-foreground">{order.warehouse.name}</span>
+                          <span className="text-xs">{order.warehouse.city}, {order.warehouse.state}</span>
+                        </div>
+                      ) : (
+                        <span className="text-red-600">No warehouse assigned</span>
+                      )}
                     </td>
                     <td className="p-4">
                       <span className={`inline-block px-2 py-1 rounded-md text-xs font-medium ${
@@ -496,6 +618,15 @@ export default function ManageOrders({ loaderData }: Route.ComponentProps) {
                     </td>
                     <td className="p-4">
                       <div className="flex items-center gap-2">
+                        {/* Split Order Button */}
+                        <button
+                          onClick={() => openSplitModal(order._id)}
+                          className="bg-secondary text-secondary-foreground px-3 py-1 rounded-md text-sm font-medium hover:bg-secondary/90 transition-colors"
+                          title="Split this order to different warehouse"
+                        >
+                          Split
+                        </button>
+                        
                         {/* Smart Actions based on order state - Customer pre-assigns courier */}
                         {order.status === 'arrived_at_warehouse' && order.courier ? (
                           <a
@@ -561,7 +692,183 @@ export default function ManageOrders({ loaderData }: Route.ComponentProps) {
             </tbody>
           </table>
         </div>
+        
+        {/* Pagination Controls */}
+        <div className="p-6 border-t border-border flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <span className="text-sm text-muted-foreground">
+              Showing {viewAll ? totalFilteredOrders : `${startIndex + 1}-${Math.min(endIndex, totalFilteredOrders)}`} of {totalFilteredOrders} orders
+            </span>
+            <select
+              value={itemsPerPage}
+              onChange={(e) => setItemsPerPage(Number(e.target.value))}
+              className="px-3 py-1 text-sm border border-border rounded focus:ring-2 focus:ring-primary/50 focus:border-primary bg-background"
+            >
+              <option value={20}>20 per page</option>
+              <option value={50}>50 per page</option>
+              <option value={100}>100 per page</option>
+            </select>
+            <button
+              onClick={() => setViewAll(!viewAll)}
+              className="px-3 py-1 text-sm border border-border rounded hover:bg-muted transition-colors"
+            >
+              {viewAll ? "Show Paginated" : "View All (Single Scroll)"}
+            </button>
+          </div>
+          
+          {!viewAll && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1 text-sm border border-border rounded hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+              <span className="text-sm text-muted-foreground">
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                onClick={() => setCurrentPage(currentPage + 1)}
+                disabled={currentPage >= totalPages}
+                className="px-3 py-1 text-sm border border-border rounded hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* Split Order Modal */}
+      {splitModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-semibold text-gray-900">Split Order</h2>
+                <button
+                  onClick={() => {
+                    setSplitModalOpen(false);
+                    setSplitOrderId(null);
+                    setSplitItems([{ description: "", quantity: 1, weight: 0, value: 0 }]);
+                    setSplitTargetWarehouse("");
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+
+            <div className="px-6 py-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Target Warehouse
+                </label>
+                <select
+                  value={splitTargetWarehouse}
+                  onChange={(e) => setSplitTargetWarehouse(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="">Select warehouse...</option>
+                  {warehouses.map(warehouse => (
+                    <option key={warehouse._id} value={warehouse._id}>
+                      {warehouse.name} ({warehouse.city})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Items to Split
+                </label>
+                {splitItems.map((item, index) => (
+                  <div key={index} className="grid grid-cols-4 gap-3 mb-3">
+                    <input
+                      type="text"
+                      placeholder="Item description"
+                      value={item.description}
+                      onChange={(e) => {
+                        const newItems = [...splitItems];
+                        newItems[index].description = e.target.value;
+                        setSplitItems(newItems);
+                      }}
+                      className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    <input
+                      type="number"
+                      placeholder="Qty"
+                      min="1"
+                      value={item.quantity}
+                      onChange={(e) => {
+                        const newItems = [...splitItems];
+                        newItems[index].quantity = Number(e.target.value);
+                        setSplitItems(newItems);
+                      }}
+                      className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    <input
+                      type="number"
+                      placeholder="Weight (kg)"
+                      min="0"
+                      step="0.1"
+                      value={item.weight}
+                      onChange={(e) => {
+                        const newItems = [...splitItems];
+                        newItems[index].weight = Number(e.target.value);
+                        setSplitItems(newItems);
+                      }}
+                      className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    <input
+                      type="number"
+                      placeholder="Value ($)"
+                      min="0"
+                      step="0.01"
+                      value={item.value}
+                      onChange={(e) => {
+                        const newItems = [...splitItems];
+                        newItems[index].value = Number(e.target.value);
+                        setSplitItems(newItems);
+                      }}
+                      className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                ))}
+                <button
+                  onClick={() => setSplitItems([...splitItems, { description: "", quantity: 1, weight: 0, value: 0 }])}
+                  className="text-sm text-blue-600 hover:text-blue-800"
+                >
+                  + Add Item
+                </button>
+              </div>
+            </div>
+
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+              <button
+                onClick={() => {
+                  setSplitModalOpen(false);
+                  setSplitOrderId(null);
+                  setSplitItems([{ description: "", quantity: 1, weight: 0, value: 0 }]);
+                  setSplitTargetWarehouse("");
+                }}
+                className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-medium transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSplitOrder}
+                disabled={!splitTargetWarehouse || splitItems.length === 0}
+                className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+              >
+                Split Order
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

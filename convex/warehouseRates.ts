@@ -6,7 +6,7 @@ export const getWarehouseRates = query({
   args: { warehouseId: v.string() },
   handler: async (ctx, { warehouseId }) => {
     const rates = await ctx.db
-      .query("warehouseShippingRates")
+      .query("shippingRates")
       .withIndex("by_warehouse", (q) => q.eq("warehouseId", warehouseId))
       .collect();
 
@@ -56,10 +56,10 @@ export const copyDefaultRatesToWarehouse = mutation({
     for (const rate of ratesToCopy) {
       if (!rate) continue;
       
-      const newRateId = await ctx.db.insert("warehouseShippingRates", {
-        warehouseId,
+      const newRateId = await ctx.db.insert("shippingRates", {
         forwarderId,
         zoneId: rate.zoneId,
+        warehouseId, // This makes it warehouse-specific
         courier: rate.courier,
         courierLogo: rate.courierLogo,
         serviceType: rate.serviceType,
@@ -156,9 +156,9 @@ export const upsertWarehouseRate = mutation({
     if (rateId) {
       // Update existing rate
       await ctx.db.patch(rateId as any, {
-        warehouseId,
         forwarderId,
         zoneId,
+        warehouseId,
         courier,
         serviceType,
         weightSlabs: sortedSlabs,
@@ -176,10 +176,10 @@ export const upsertWarehouseRate = mutation({
       return rateId;
     } else {
       // Create new rate
-      const newRateId = await ctx.db.insert("warehouseShippingRates", {
-        warehouseId,
+      const newRateId = await ctx.db.insert("shippingRates", {
         forwarderId,
         zoneId,
+        warehouseId, // This makes it warehouse-specific
         courier,
         serviceType,
         weightSlabs: sortedSlabs,

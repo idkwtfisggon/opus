@@ -1,15 +1,17 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 
-// Get orders for a forwarder with filtering
+// Get orders for a forwarder with filtering and pagination
 export const getForwarderOrders = query({
   args: { 
     forwarderId: v.string(),
     status: v.optional(v.string()),
     limit: v.optional(v.number()),
+    offset: v.optional(v.number()),
     searchQuery: v.optional(v.string()),
+    warehouseId: v.optional(v.string()),
   },
-  handler: async (ctx, { forwarderId, status, limit = 50, searchQuery }) => {
+  handler: async (ctx, { forwarderId, status, limit = 20, offset = 0, searchQuery, warehouseId }) => {
     let query = ctx.db
       .query("orders")
       .withIndex("by_forwarder", (q) => q.eq("forwarderId", forwarderId));
@@ -27,6 +29,11 @@ export const getForwarderOrders = query({
       orders = orders.filter(order => order.forwarderId === forwarderId);
     }
 
+    // Filter by warehouse if specified
+    if (warehouseId) {
+      orders = orders.filter(order => order.warehouseId === warehouseId);
+    }
+
     // Search functionality
     if (searchQuery) {
       const searchLower = searchQuery.toLowerCase();
@@ -40,7 +47,99 @@ export const getForwarderOrders = query({
     // Sort by creation time (newest first)
     orders.sort((a, b) => b.createdAt - a.createdAt);
 
-    return orders.slice(0, limit);
+    // Get warehouse details for each order
+    const ordersWithWarehouses = await Promise.all(
+      orders.map(async (order) => {
+        const warehouse = await ctx.db.get(order.warehouseId as any);
+        return {
+          ...order,
+          warehouse: warehouse ? {
+            _id: warehouse._id,
+            name: warehouse.name,
+            city: warehouse.city,
+            state: warehouse.state,
+            country: warehouse.country,
+          } : null,
+        };
+      })
+    );
+
+    // Apply pagination
+    const total = ordersWithWarehouses.length;
+    const paginatedOrders = limit === -1 ? ordersWithWarehouses : ordersWithWarehouses.slice(offset, offset + limit);
+
+    return {
+      orders: paginatedOrders,
+      total,
+      hasMore: limit !== -1 && (offset + limit) < total,
+    };
+  },
+});
+
+// Split order to different warehouse
+export const splitOrderToWarehouse = mutation({
+  args: {
+    orderId: v.string(),
+    targetWarehouseId: v.string(),
+    items: v.array(v.object({
+      description: v.string(),
+      quantity: v.number(),
+      weight: v.number(),
+      value: v.number(),
+    })),
+    updatedBy: v.string(),
+    notes: v.optional(v.string()),
+  },
+  handler: async (ctx, { orderId, targetWarehouseId, items, updatedBy, notes }) => {
+    const originalOrder = await ctx.db.get(orderId as any);
+    if (!originalOrder) {
+      throw new Error("Order not found");
+    }
+
+    // Verify target warehouse exists
+    const targetWarehouse = await ctx.db.get(targetWarehouseId as any);
+    if (!targetWarehouse) {
+      throw new Error("Target warehouse not found");
+    }
+
+    // Calculate totals for split items
+    const splitWeight = items.reduce((sum, item) => sum + (item.weight * item.quantity), 0);
+    const splitValue = items.reduce((sum, item) => sum + (item.value * item.quantity), 0);
+
+    // Create new order for split items
+    const newOrderId = await ctx.db.insert("orders", {
+      customerId: originalOrder.customerId,
+      customerName: originalOrder.customerName,
+      customerEmail: originalOrder.customerEmail,
+      customerPhone: originalOrder.customerPhone,
+      shippingAddress: originalOrder.shippingAddress,
+      trackingNumber: `${originalOrder.trackingNumber}-SPLIT-${Date.now()}`,
+      merchantName: originalOrder.merchantName,
+      merchantOrderId: originalOrder.merchantOrderId,
+      declaredWeight: splitWeight,
+      declaredValue: splitValue,
+      currency: originalOrder.currency,
+      packageDescription: items.map(item => `${item.quantity}x ${item.description}`).join(', '),
+      specialInstructions: notes || `Split from ${originalOrder.trackingNumber}`,
+      warehouseId: targetWarehouseId,
+      forwarderId: originalOrder.forwarderId,
+      status: "incoming",
+      shippingType: originalOrder.shippingType,
+      courier: originalOrder.courier,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+
+    // Update original order to reflect the split
+    await ctx.db.patch(originalOrder._id, {
+      declaredWeight: Math.max(0, originalOrder.declaredWeight - splitWeight),
+      declaredValue: Math.max(0, originalOrder.declaredValue - splitValue),
+      specialInstructions: (originalOrder.specialInstructions || "") + 
+        ` | Split: ${items.length} item(s) moved to ${targetWarehouse.name}`,
+      updatedAt: Date.now(),
+    });
+
+    return { newOrderId, splitWeight, splitValue };
   },
 });
 

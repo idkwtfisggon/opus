@@ -124,21 +124,21 @@ export const upsertShippingRate = mutation({
     
     // Weight slabs array
     weightSlabs: v.array(v.object({
-      minWeight: v.number(),
-      maxWeight: v.optional(v.number()),
-      ratePerKg: v.optional(v.number()),
-      flatRate: v.optional(v.number()),
+      minWeight: v.float64(),
+      maxWeight: v.optional(v.float64()),
+      ratePerKg: v.optional(v.float64()),
+      flatRate: v.optional(v.float64()),
       label: v.string(),
     })),
     
     // Additional fees
-    handlingFee: v.number(),
-    insuranceFee: v.optional(v.number()),
-    fuelSurcharge: v.optional(v.number()),
+    handlingFee: v.float64(),
+    insuranceFee: v.optional(v.float64()),
+    fuelSurcharge: v.optional(v.float64()),
     
     // Service details
-    estimatedDaysMin: v.number(),
-    estimatedDaysMax: v.number(),
+    estimatedDaysMin: v.float64(),
+    estimatedDaysMax: v.float64(),
     requiresSignature: v.optional(v.boolean()),
     trackingIncluded: v.optional(v.boolean()),
     insuranceIncluded: v.optional(v.boolean()),

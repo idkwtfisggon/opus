@@ -6,7 +6,7 @@ import ForwarderOnboarding from "~/components/forwarder/ForwarderOnboarding";
 import OrderVolumeChart from "~/components/analytics/OrderVolumeChart";
 import CreateTestOrders from "~/components/debug/CreateTestOrders";
 import { useState } from "react";
-import { useQuery } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
 
 export async function loader(args: Route.LoaderArgs) {
   const { userId } = await getAuth(args);
@@ -65,6 +65,33 @@ export default function ForwarderDashboard({ loaderData }: Route.ComponentProps)
     api.analytics.getPerformanceMetrics, 
     forwarder ? { forwarderId: forwarder._id } : "skip"
   );
+  
+  // Timezone fix mutation - use the existing upsertForwarder instead
+  const updateForwarder = useMutation(api.forwarders.upsertForwarder);
+  const [fixingTimezone, setFixingTimezone] = useState(false);
+  
+  const handleFixTimezone = async () => {
+    if (!forwarder) return;
+    setFixingTimezone(true);
+    try {
+      await updateForwarder({
+        userId: forwarder.userId,
+        businessName: forwarder.businessName,
+        contactEmail: forwarder.contactEmail,
+        contactPhone: forwarder.contactPhone,
+        timezone: "Asia/Singapore",
+        maxParcelsPerMonth: forwarder.maxParcelsPerMonth,
+        maxParcelWeight: forwarder.maxParcelWeight
+      });
+      alert("Timezone updated to Singapore! Refreshing page...");
+      window.location.reload();
+    } catch (error) {
+      console.error("Failed to update timezone:", error);
+      alert(`Failed to update timezone: ${error.message || error}`);
+    } finally {
+      setFixingTimezone(false);
+    }
+  };
 
   if (showOnboarding) {
     return (
@@ -97,8 +124,20 @@ export default function ForwarderDashboard({ loaderData }: Route.ComponentProps)
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-semibold tracking-tight text-foreground">Dashboard</h1>
-        <div className="text-sm text-muted-foreground">
-          Welcome back to your logistics hub
+        <div className="flex items-center gap-4">
+          <div className="text-sm text-muted-foreground">
+            Welcome back to your logistics hub
+          </div>
+          {forwarder?.timezone !== "Asia/Singapore" && (
+            <button
+              onClick={handleFixTimezone}
+              disabled={fixingTimezone}
+              className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-md text-sm font-medium transition-colors disabled:opacity-50"
+              title="Your timezone is not set to Singapore. Click to fix."
+            >
+              {fixingTimezone ? "Fixing..." : "Fix Timezone"}
+            </button>
+          )}
         </div>
       </div>
       

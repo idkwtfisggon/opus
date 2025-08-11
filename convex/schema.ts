@@ -109,6 +109,28 @@ export default defineSchema({
     maxWeightKg: v.number(),
     maxDimensionsCm: v.string(), // JSON string "L x W x H"
     currentCapacity: v.number(), // Current number of parcels
+    
+    // Operating hours (if not set, inherit from forwarder or assume regular office hours)
+    operatingHours: v.optional(v.object({
+      monday: v.optional(v.object({ open: v.string(), close: v.string(), closed: v.optional(v.boolean()) })),
+      tuesday: v.optional(v.object({ open: v.string(), close: v.string(), closed: v.optional(v.boolean()) })),
+      wednesday: v.optional(v.object({ open: v.string(), close: v.string(), closed: v.optional(v.boolean()) })),
+      thursday: v.optional(v.object({ open: v.string(), close: v.string(), closed: v.optional(v.boolean()) })),
+      friday: v.optional(v.object({ open: v.string(), close: v.string(), closed: v.optional(v.boolean()) })),
+      saturday: v.optional(v.object({ open: v.string(), close: v.string(), closed: v.optional(v.boolean()) })),
+      sunday: v.optional(v.object({ open: v.string(), close: v.string(), closed: v.optional(v.boolean()) })),
+    })),
+    holidaySchedule: v.optional(v.array(v.object({
+      name: v.string(),
+      startDate: v.string(), // YYYY-MM-DD format
+      endDate: v.optional(v.string()), // YYYY-MM-DD format (for multi-day periods)
+      type: v.union(v.literal("closed"), v.literal("modified_hours")), // closed or modified hours
+      modifiedHours: v.optional(v.object({
+        open: v.string(), // HH:MM format
+        close: v.string(), // HH:MM format
+      })),
+    }))),
+    
     isActive: v.boolean(),
     createdAt: v.number(),
     updatedAt: v.number(),

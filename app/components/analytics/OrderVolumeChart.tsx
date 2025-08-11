@@ -33,6 +33,14 @@ export default function OrderVolumeChart({ forwarderId }: OrderVolumeChartProps)
     );
   }
   
+  // Debug logging
+  console.log("DEBUG - analytics data:", analytics);
+  console.log("DEBUG - daily volume sample:", analytics.dailyVolume.slice(0, 5));
+  console.log("DEBUG - current browser timezone:", Intl.DateTimeFormat().resolvedOptions().timeZone);
+  console.log("DEBUG - test date conversion:", new Date("2025-08-12").toLocaleDateString('en-SG', { timeZone: 'Asia/Singapore' }));
+  console.log("DEBUG - current date in Singapore:", new Date().toLocaleDateString('en-SG', { timeZone: 'Asia/Singapore' }));
+  console.log("DEBUG - current UTC date:", new Date().toISOString().split('T')[0]);
+  
 
   // Safety checks
   if (!analytics.dailyVolume || analytics.dailyVolume.length === 0) {
@@ -141,7 +149,9 @@ export default function OrderVolumeChart({ forwarderId }: OrderVolumeChartProps)
           <div className="text-2xl font-bold text-foreground">{analytics.peakDay.count}</div>
           <div className="text-sm text-muted-foreground">Peak Day</div>
           <div className="text-xs text-muted-foreground mt-1">
-            {new Date(analytics.peakDay.date).toLocaleDateString()}
+            {new Date(analytics.peakDay.date).toLocaleDateString('en-SG', { 
+              timeZone: 'Asia/Singapore'
+            })}
           </div>
         </div>
       </div>
@@ -207,10 +217,11 @@ export default function OrderVolumeChart({ forwarderId }: OrderVolumeChartProps)
                 {isHovered && (
                   <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 bg-popover border border-border rounded-lg shadow-lg p-3 text-sm whitespace-nowrap z-10">
                     <div className="font-medium text-foreground">
-                      {new Date(day.date).toLocaleDateString(undefined, { 
+                      {new Date(day.date).toLocaleDateString('en-SG', { 
                         weekday: 'short', 
                         month: 'short', 
-                        day: 'numeric' 
+                        day: 'numeric',
+                        timeZone: 'Asia/Singapore'
                       })}
                     </div>
                     <div className="text-muted-foreground">
@@ -247,7 +258,11 @@ export default function OrderVolumeChart({ forwarderId }: OrderVolumeChartProps)
                       : 'text-muted-foreground'
                   }`}
                 >
-                  {new Date(day.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                  {new Date(day.date).toLocaleDateString('en-SG', { 
+                    month: 'short', 
+                    day: 'numeric',
+                    timeZone: 'Asia/Singapore'
+                  })}
                 </div>
               );
             } else {
