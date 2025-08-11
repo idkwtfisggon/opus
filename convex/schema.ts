@@ -204,6 +204,7 @@ export default defineSchema({
   shippingRates: defineTable({
     forwarderId: v.string(),
     zoneId: v.string(), // Links to shippingZones
+    warehouseId: v.optional(v.string()), // null = applies to all warehouses, specific ID = applies to that warehouse only
     
     // Courier and branding
     courier: v.string(), // "DHL", "UPS", "FedEx", "Local Courier", etc.
@@ -262,7 +263,9 @@ export default defineSchema({
     .index("by_zone_service", ["zoneId", "serviceType"])
     .index("by_active", ["forwarderId", "isActive"])
     .index("by_public", ["isPublic"])
-    .index("by_forwarder_public", ["forwarderId", "isPublic"]),
+    .index("by_forwarder_public", ["forwarderId", "isPublic"])
+    .index("by_warehouse", ["warehouseId"])
+    .index("by_forwarder_warehouse", ["forwarderId", "warehouseId"]),
 
   // Consolidated shipping settings
   consolidatedShippingSettings: defineTable({
@@ -414,6 +417,9 @@ export default defineSchema({
     handlingTimeHours: v.number(), // How long to process packages from this area
     additionalFees: v.optional(v.number()), // Extra cost for this service area
     specialInstructions: v.optional(v.string()), // "Packages from rural areas may take longer"
+    
+    // Rate configuration
+    useCustomRates: v.optional(v.boolean()), // false = use forwarder default rates, true = use warehouse-specific rates
     
     // Operational settings
     isActive: v.boolean(),

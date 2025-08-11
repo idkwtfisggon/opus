@@ -36,7 +36,6 @@ export default [
     route("forwarder/orders", "routes/forwarder/orders.tsx"),
     route("forwarder/warehouses", "routes/forwarder/warehouses.tsx"),
     route("forwarder/service-areas", "routes/forwarder/service-areas.tsx"),
-    route("forwarder/shipping-rates", "routes/forwarder/shipping-rates.tsx"),
     route("forwarder/analytics", "routes/forwarder/analytics.tsx"),
     route("forwarder/settings", "routes/forwarder/settings.tsx"),
     route("forwarder/account", "routes/forwarder/account.tsx"),

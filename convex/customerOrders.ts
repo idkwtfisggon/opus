@@ -10,10 +10,12 @@ export const getAvailableCountries = query({
       .filter((q) => q.eq(q.field("isActive"), true))
       .collect();
 
-    // Extract unique countries
+    // Extract unique countries as-is
     const countriesSet = new Set<string>();
     zones.forEach(zone => {
-      zone.countries.forEach(country => countriesSet.add(country));
+      zone.countries.forEach(country => {
+        countriesSet.add(country);
+      });
     });
 
     return Array.from(countriesSet).sort();
@@ -82,7 +84,7 @@ export const searchShippingOptions = query({
       const forwarder = await ctx.db.get((warehouse as any).forwarderId);
       if (!forwarder) continue;
 
-      // Find shipping zones for this forwarder that include the destination country
+      // STEP 2.1: Get forwarder's shipping zones and rates from settings
       const zones = await ctx.db
         .query("shippingZones")
         .withIndex("by_forwarder", (q) => q.eq("forwarderId", forwarder._id))
@@ -91,18 +93,35 @@ export const searchShippingOptions = query({
 
       const availableZones = zones.filter(zone => zone.countries.includes(args.toCountry));
 
-      // STEP 3: Get shipping rates for eligible zones
+      // STEP 2.2: Get shipping rates for eligible zones
       for (const zone of availableZones) {
-        const rates = await ctx.db
-          .query("shippingRates")
-          .withIndex("by_zone", (q) => q.eq("zoneId", zone._id))
-          .filter((q) => q.and(
-            q.eq(q.field("isActive"), true),
-            q.eq(q.field("isPublic"), true)
-          ))
-          .collect();
+        let rates;
+        
+        // Check if service area uses custom rates or default rates
+        if (serviceArea.useCustomRates) {
+          // Use warehouse-specific rates
+          rates = await ctx.db
+            .query("warehouseShippingRates")
+            .withIndex("by_warehouse", (q) => q.eq("warehouseId", warehouse._id))
+            .filter((q) => q.eq(q.field("isActive"), true))
+            .collect();
+        } else {
+          // Use forwarder default rates
+          rates = await ctx.db
+            .query("shippingRates")
+            .withIndex("by_forwarder", (q) => q.eq("forwarderId", forwarder._id))
+            .filter((q) => q.eq(q.field("isActive"), true))
+            .collect();
+        }
 
-        for (const rate of rates) {
+        // Filter rates that belong to this zone
+        const zoneRates = rates.filter(rate => {
+          // Check if this rate applies to the destination zone
+          const rateZone = zones.find(z => z._id === rate.zoneId);
+          return rateZone && rateZone.countries.includes(args.toCountry);
+        });
+
+        for (const rate of zoneRates) {
           // Calculate price for this weight
           const applicableSlab = rate.weightSlabs.find(slab => 
             args.weight >= slab.minWeight && 
@@ -126,8 +145,8 @@ export const searchShippingOptions = query({
             (rate.fuelSurcharge || 0) + 
             serviceAreaFee;
 
-          // Calculate availability percentage
-          const availabilityPercentage = Math.max(0, 100 - rate.currentCapacityUsed);
+          // Calculate availability percentage  
+          const availabilityPercentage = Math.max(0, 100 - (rate.currentCapacityUsed || 0));
 
           // Calculate total estimated delivery time (handling + shipping)
           const totalEstimatedDaysMin = Math.ceil(serviceArea.handlingTimeHours / 24) + rate.estimatedDaysMin;
@@ -149,8 +168,8 @@ export const searchShippingOptions = query({
               country: (warehouse as any).country || "",
             },
             service: {
-              name: rate.serviceName,
-              description: rate.serviceDescription,
+              name: rate.serviceName || `${rate.courier} ${rate.serviceType}`,
+              description: rate.serviceDescription || `${rate.serviceType} shipping via ${rate.courier}`,
               type: rate.serviceType,
             },
             courier: {
@@ -184,7 +203,7 @@ export const searchShippingOptions = query({
                      availabilityPercentage > 50 ? "medium" : "low",
             },
             serviceAreaPriority: warehouseData.priority,
-            displayOrder: rate.displayOrder,
+            displayOrder: rate.displayOrder || 999,
             specialInstructions: serviceArea.specialInstructions,
           });
         }

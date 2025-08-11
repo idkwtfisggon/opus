@@ -118,6 +118,7 @@ export const upsertShippingRate = mutation({
     forwarderId: v.string(),
     rateId: v.optional(v.string()),
     zoneId: v.string(),
+    warehouseId: v.optional(v.string()), // null = all warehouses, specific ID = specific warehouse
     courier: v.string(),
     serviceType: v.union(v.literal("standard"), v.literal("express"), v.literal("overnight")),
     
@@ -148,7 +149,8 @@ export const upsertShippingRate = mutation({
     const { 
       forwarderId, 
       rateId, 
-      zoneId, 
+      zoneId,
+      warehouseId,
       courier, 
       serviceType, 
       weightSlabs,
@@ -176,6 +178,7 @@ export const upsertShippingRate = mutation({
       // Update existing rate
       await ctx.db.patch(rateId as any, {
         zoneId,
+        warehouseId,
         courier,
         serviceType,
         weightSlabs: sortedSlabs,
@@ -196,6 +199,7 @@ export const upsertShippingRate = mutation({
       const newRateId = await ctx.db.insert("shippingRates", {
         forwarderId,
         zoneId,
+        warehouseId,
         courier,
         serviceType,
         weightSlabs: sortedSlabs,

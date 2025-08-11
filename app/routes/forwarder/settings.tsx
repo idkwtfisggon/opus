@@ -88,6 +88,12 @@ export default function ForwarderSettings({ loaderData }: Route.ComponentProps) 
     forwarder ? { forwarderId: forwarder._id } : "skip"
   );
   
+  // Get warehouses for the forwarder
+  const warehouses = useQuery(
+    api.warehouses.getForwarderWarehouses,
+    forwarder ? { forwarderId: forwarder._id } : "skip"
+  );
+  
   const upsertZone = useMutation(api.forwarderSettings.upsertShippingZone);
   const upsertRate = useMutation(api.forwarderSettings.upsertShippingRate);
   const updateConsolidatedSettings = useMutation(api.forwarderSettings.updateConsolidatedShippingSettings);
@@ -117,6 +123,7 @@ export default function ForwarderSettings({ loaderData }: Route.ComponentProps) 
   
   const [rateForm, setRateForm] = useState({
     zoneId: "",
+    warehouseId: undefined as string | undefined,
     courier: "",
     serviceType: "standard" as "standard" | "express" | "overnight",
     weightSlabs: [
@@ -244,11 +251,12 @@ export default function ForwarderSettings({ loaderData }: Route.ComponentProps) 
   const handleSaveRate = async () => {
     if (!forwarder || !rateForm.zoneId || !rateForm.courier) return;
     
-    // Check for duplicate courier+service combination in the same zone
+    // Check for duplicate courier+service combination in the same zone for the same warehouse scope
     const existingRate = settings?.rates?.find((rate: any) => 
       rate.zoneId === rateForm.zoneId &&
       rate.courier === rateForm.courier &&
       rate.serviceType === rateForm.serviceType &&
+      rate.warehouseId === rateForm.warehouseId && // Include warehouse scope in duplicate check
       rate._id !== editingRate?._id // Allow editing existing rate
     );
     
@@ -272,6 +280,7 @@ export default function ForwarderSettings({ loaderData }: Route.ComponentProps) 
         forwarderId: forwarder._id,
         rateId: editingRate?._id,
         zoneId: rateForm.zoneId,
+        warehouseId: rateForm.warehouseId,
         courier: rateForm.courier,
         serviceType: rateForm.serviceType,
         weightSlabs: validSlabs,
@@ -289,6 +298,7 @@ export default function ForwarderSettings({ loaderData }: Route.ComponentProps) 
       // Reset form
       setRateForm({
         zoneId: "",
+        warehouseId: undefined,
         courier: "",
         serviceType: "standard",
         weightSlabs: [
@@ -346,6 +356,7 @@ export default function ForwarderSettings({ loaderData }: Route.ComponentProps) 
     setEditingRate(rate);
     setRateForm({
       zoneId: rate.zoneId,
+      warehouseId: rate.warehouseId,
       courier: rate.courier,
       serviceType: rate.serviceType,
       weightSlabs: rate.weightSlabs || [
@@ -997,7 +1008,7 @@ export default function ForwarderSettings({ loaderData }: Route.ComponentProps) 
                   </h3>
                   
                   {/* Basic Rate Info */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                     <div>
                       <label className="block text-sm font-medium text-foreground mb-2">Zone</label>
                       <select
@@ -1020,11 +1031,12 @@ export default function ForwarderSettings({ loaderData }: Route.ComponentProps) 
                       >
                         <option value="">Select Courier</option>
                         {COURIERS.map(courier => {
-                          // Check if this courier+service combination already exists for selected zone
+                          // Check if this courier+service combination already exists for selected zone and warehouse
                           const isDisabled = rateForm.zoneId && settings?.rates?.some((rate: any) => 
                             rate.zoneId === rateForm.zoneId &&
                             rate.courier === courier &&
                             rate.serviceType === rateForm.serviceType &&
+                            rate.warehouseId === rateForm.warehouseId &&
                             rate._id !== editingRate?._id
                           );
                           return (
@@ -1046,6 +1058,7 @@ export default function ForwarderSettings({ loaderData }: Route.ComponentProps) 
                             rate.zoneId === rateForm.zoneId &&
                             rate.courier === rateForm.courier &&
                             rate.serviceType === newServiceType &&
+                            rate.warehouseId === rateForm.warehouseId &&
                             rate._id !== editingRate?._id
                           );
                           
@@ -1062,6 +1075,21 @@ export default function ForwarderSettings({ loaderData }: Route.ComponentProps) 
                         <option value="overnight">Overnight</option>
                       </select>
                     </div>
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-2">Apply To</label>
+                      <select
+                        value={rateForm.warehouseId || ""}
+                        onChange={(e) => setRateForm({ ...rateForm, warehouseId: e.target.value || undefined })}
+                        className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary bg-background"
+                      >
+                        <option value="">All Warehouses</option>
+                        {warehouses?.map((warehouse: any) => (
+                          <option key={warehouse._id} value={warehouse._id}>
+                            {warehouse.name} ({warehouse.city})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
 
                   {/* Validation Warning */}
@@ -1069,6 +1097,7 @@ export default function ForwarderSettings({ loaderData }: Route.ComponentProps) 
                     rate.zoneId === rateForm.zoneId &&
                     rate.courier === rateForm.courier &&
                     rate.serviceType === rateForm.serviceType &&
+                    rate.warehouseId === rateForm.warehouseId &&
                     rate._id !== editingRate?._id
                   ) && (
                     <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
@@ -1324,6 +1353,7 @@ export default function ForwarderSettings({ loaderData }: Route.ComponentProps) 
                           setEditingRate(null);
                           setRateForm({
                             zoneId: "",
+                            warehouseId: undefined,
                             courier: "",
                             serviceType: "standard",
                             weightSlabs: [
@@ -1382,6 +1412,13 @@ export default function ForwarderSettings({ loaderData }: Route.ComponentProps) 
                                   : "bg-gray-100 text-gray-600"
                               }`}>
                                 {rate.isActive ? "Active" : "Inactive"}
+                              </span>
+                              <span className="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800 border border-blue-200">
+                                {rate.warehouseId ? (
+                                  warehouses?.find((w: any) => w._id === rate.warehouseId)?.name || "Specific Warehouse"
+                                ) : (
+                                  "All Warehouses"
+                                )}
                               </span>
                             </div>
                           </div>
