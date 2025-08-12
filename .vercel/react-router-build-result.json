@@ -17,6 +17,8 @@
       "routes/onboarding/forwarder": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/sign-in": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/sign-up": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/staff-signup/index": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/auth-redirect": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/pricing": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/success": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/subscription-required": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
@@ -37,6 +39,7 @@
       "routes/forwarder/analytics": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/forwarder/settings": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/forwarder/account": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/staff/index": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/staff/scanner": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/staff/orders": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/staff/activity": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
@@ -108,6 +111,24 @@
         "parentId": "root",
         "file": "app/routes/sign-up.tsx",
         "path": "sign-up/*",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/staff-signup/index": {
+        "id": "routes/staff-signup/index",
+        "parentId": "root",
+        "file": "app/routes/staff-signup/index.tsx",
+        "path": "staff-signup",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/auth-redirect": {
+        "id": "routes/auth-redirect",
+        "parentId": "root",
+        "file": "app/routes/auth-redirect.tsx",
+        "path": "auth-redirect",
         "config": {
           "runtime": "nodejs"
         }
@@ -316,6 +337,15 @@
         "file": "app/routes/staff/layout.tsx",
         "config": {}
       },
+      "routes/staff/index": {
+        "id": "routes/staff/index",
+        "parentId": "routes/staff/layout",
+        "file": "app/routes/staff/index.tsx",
+        "path": "staff",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
       "routes/staff/scanner": {
         "id": "routes/staff/scanner",
         "parentId": "routes/staff/layout",
@@ -412,6 +442,18 @@
         "parentId": "root",
         "file": "routes/sign-up.tsx",
         "path": "sign-up/*"
+      },
+      "routes/staff-signup/index": {
+        "id": "routes/staff-signup/index",
+        "parentId": "root",
+        "file": "routes/staff-signup/index.tsx",
+        "path": "staff-signup"
+      },
+      "routes/auth-redirect": {
+        "id": "routes/auth-redirect",
+        "parentId": "root",
+        "file": "routes/auth-redirect.tsx",
+        "path": "auth-redirect"
       },
       "routes/pricing": {
         "id": "routes/pricing",
@@ -552,6 +594,12 @@
         "id": "routes/staff/layout",
         "parentId": "root",
         "file": "routes/staff/layout.tsx"
+      },
+      "routes/staff/index": {
+        "id": "routes/staff/index",
+        "parentId": "routes/staff/layout",
+        "file": "routes/staff/index.tsx",
+        "path": "staff"
       },
       "routes/staff/scanner": {
         "id": "routes/staff/scanner",

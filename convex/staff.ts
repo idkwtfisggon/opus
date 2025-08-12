@@ -457,3 +457,166 @@ export const joinWithInviteCode = mutation({
     return { staffId, message: "Successfully joined warehouse team!" };
   },
 });
+
+// Status progression helper - defines valid status transitions
+const STATUS_PROGRESSION = {
+  "incoming": ["arrived_at_warehouse", "received"], // received is legacy but allowed
+  "received": ["arrived_at_warehouse", "packed"], // legacy status
+  "arrived_at_warehouse": ["packed"],
+  "packed": ["awaiting_pickup"],
+  "awaiting_pickup": ["shipped", "in_transit"], // shipped is legacy but allowed
+  "shipped": ["in_transit", "delivered"], // legacy status
+  "in_transit": ["delivered"],
+  "delivered": [] // Final status
+};
+
+// Helper function to validate status transitions
+function isValidStatusTransition(currentStatus: string, newStatus: string, staffRole: string): { isValid: boolean, reason?: string } {
+  // Same status is always allowed (no-op)
+  if (currentStatus === newStatus) {
+    return { isValid: true };
+  }
+
+  // Check if the new status is in the valid progressions for current status
+  const validNextStatuses = STATUS_PROGRESSION[currentStatus as keyof typeof STATUS_PROGRESSION] || [];
+  
+  if (validNextStatuses.includes(newStatus)) {
+    return { isValid: true };
+  }
+
+  // Check if this is a backwards transition
+  const allStatuses = Object.keys(STATUS_PROGRESSION);
+  const currentIndex = allStatuses.indexOf(currentStatus);
+  const newIndex = allStatuses.indexOf(newStatus);
+  
+  if (currentIndex > newIndex) {
+    // This is a backwards transition - only supervisors and managers can do this
+    if (staffRole === "supervisor" || staffRole === "manager") {
+      return { isValid: true };
+    } else {
+      return { isValid: false, reason: "Only supervisors and managers can revert order status backwards" };
+    }
+  }
+
+  return { isValid: false, reason: `Cannot change status from ${currentStatus} to ${newStatus}` };
+}
+
+// Update order status with staff validation
+export const updateOrderStatus = mutation({
+  args: {
+    orderId: v.string(),
+    newStatus: v.string(),
+    staffId: v.string(),
+    notes: v.optional(v.string()),
+    scanData: v.optional(v.object({
+      barcodeValue: v.string(),
+      location: v.string(),
+      deviceInfo: v.string(),
+    })),
+  },
+  handler: async (ctx, args) => {
+    // Get the order
+    const order = await ctx.db.get(args.orderId as any);
+    if (!order) {
+      throw new Error("Order not found");
+    }
+
+    // Get the staff member
+    const staff = await ctx.db.get(args.staffId as any);
+    if (!staff || !staff.isActive) {
+      throw new Error("Staff member not found or inactive");
+    }
+
+    // Verify staff has permission to update order status
+    if (!staff.permissions.canUpdateOrderStatus) {
+      throw new Error("You don't have permission to update order status");
+    }
+
+    // Verify staff is assigned to this warehouse
+    if (!staff.assignedWarehouses.includes(order.warehouseId)) {
+      throw new Error("You are not assigned to this warehouse");
+    }
+
+    // Validate status transition
+    const validation = isValidStatusTransition(order.status, args.newStatus, staff.role);
+    if (!validation.isValid) {
+      throw new Error(validation.reason || "Invalid status transition");
+    }
+
+    // Update the order status
+    await ctx.db.patch(args.orderId as any, {
+      status: args.newStatus,
+      updatedAt: Date.now(),
+      // Update specific timestamp fields based on new status
+      ...(args.newStatus === "arrived_at_warehouse" || args.newStatus === "received" ? { receivedAt: Date.now() } : {}),
+      ...(args.newStatus === "packed" ? { packedAt: Date.now() } : {}),
+      ...(args.newStatus === "shipped" || args.newStatus === "in_transit" ? { shippedAt: Date.now() } : {}),
+      ...(args.newStatus === "delivered" ? { deliveredAt: Date.now() } : {}),
+    });
+
+    // Log the status change in order history
+    await ctx.db.insert("orderStatusHistory", {
+      orderId: args.orderId,
+      previousStatus: order.status,
+      newStatus: args.newStatus,
+      changedBy: args.staffId,
+      changedByType: "staff",
+      staffName: staff.name,
+      warehouseName: order.warehouseId, // Will be resolved later if needed
+      notes: args.notes,
+      scanData: args.scanData,
+      changedAt: Date.now(),
+    });
+
+    // Log staff activity
+    await ctx.db.insert("staffActivity", {
+      staffId: args.staffId,
+      forwarderId: staff.forwarderId,
+      warehouseId: order.warehouseId,
+      activityType: "status_update",
+      orderId: args.orderId,
+      details: {
+        oldStatus: order.status,
+        newStatus: args.newStatus,
+        scanLocation: args.scanData?.location,
+      },
+      timestamp: Date.now(),
+    });
+
+    return { 
+      success: true, 
+      message: `Order status updated to ${args.newStatus}`,
+      previousStatus: order.status,
+      newStatus: args.newStatus 
+    };
+  },
+});
+
+// Get valid next statuses for an order (for UI)
+export const getValidNextStatuses = query({
+  args: { 
+    orderId: v.string(), 
+    staffId: v.string() 
+  },
+  handler: async (ctx, args) => {
+    const order = await ctx.db.get(args.orderId as any);
+    const staff = await ctx.db.get(args.staffId as any);
+    
+    if (!order || !staff) {
+      return [];
+    }
+
+    const currentStatus = order.status;
+    const staffRole = staff.role;
+    const validNextStatuses = STATUS_PROGRESSION[currentStatus as keyof typeof STATUS_PROGRESSION] || [];
+    
+    // If supervisor/manager, they can also go backwards (show all statuses except delivered if not delivered)
+    if (staffRole === "supervisor" || staffRole === "manager") {
+      const allStatuses = Object.keys(STATUS_PROGRESSION);
+      return allStatuses.filter(status => status !== currentStatus);
+    }
+    
+    // Regular staff can only move forward
+    return validNextStatuses;
+  },
+});

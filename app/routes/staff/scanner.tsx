@@ -49,8 +49,14 @@ export default function StaffScanner({ loaderData }: any) {
   const todaysOrders = useQuery(api.staff.getOrdersForStaff, { staffId: staff._id });
 
   // Mutations
-  const updateOrderStatus = useMutation(api.orderStatusHistory.updateOrderStatusWithTracking);
+  const updateOrderStatus = useMutation(api.staff.updateOrderStatus);
   const logScan = useMutation(api.orderStatusHistory.logStaffScan);
+  
+  // Get valid next statuses for current order
+  const validNextStatuses = useQuery(
+    api.staff.getValidNextStatuses,
+    currentOrder ? { orderId: currentOrder._id, staffId: staff._id } : "skip"
+  );
 
   // Camera and scanning logic
   const startScanning = async () => {
@@ -139,9 +145,8 @@ export default function StaffScanner({ loaderData }: any) {
       
       await updateOrderStatus({
         orderId: currentOrder._id,
-        newStatus: selectedStatus as any,
-        changedBy: staff._id,
-        changedByType: "staff",
+        newStatus: selectedStatus,
+        staffId: staff._id,
         notes: notes || undefined,
         scanData: {
           barcodeValue: scanResult || currentOrder.trackingNumber,
@@ -174,17 +179,7 @@ export default function StaffScanner({ loaderData }: any) {
     }
   };
 
-  const getNextStatusOptions = (currentStatus: string) => {
-    const statusFlow = {
-      'incoming': ['arrived_at_warehouse'],
-      'arrived_at_warehouse': ['packed'],
-      'packed': ['awaiting_pickup'],
-      'awaiting_pickup': ['shipped', 'in_transit'],
-      'shipped': ['in_transit', 'delivered'],
-      'in_transit': ['delivered']
-    };
-    return statusFlow[currentStatus as keyof typeof statusFlow] || [];
-  };
+  // Remove the old getNextStatusOptions function - now using validNextStatuses from query
 
   if (!todaysOrders) {
     return (
@@ -210,6 +205,16 @@ export default function StaffScanner({ loaderData }: any) {
           <p className="text-sm text-muted-foreground text-center mt-1">
             {staff.name} • {staff.warehouses.map(w => w.name).join(', ')}
           </p>
+          <div className="flex justify-center mt-2">
+            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+              staff.role === 'manager' ? 'bg-purple-100 text-purple-800' :
+              staff.role === 'supervisor' ? 'bg-blue-100 text-blue-800' :
+              'bg-green-100 text-green-800'
+            }`}>
+              {staff.role.replace('_', ' ')}
+              {staff.role === 'warehouse_worker' && ' (Forward-only updates)'}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -361,12 +366,22 @@ export default function StaffScanner({ loaderData }: any) {
                   className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                 >
                   <option value="">Select new status...</option>
-                  {getNextStatusOptions(currentOrder.status).map((status) => (
+                  {(validNextStatuses || []).map((status) => (
                     <option key={status} value={status}>
                       {status.replace('_', ' ')}
                     </option>
                   ))}
                 </select>
+                {staff.role === 'warehouse_worker' && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    ⚠️ Workers can only move orders forward. Contact supervisor for status reversals.
+                  </p>
+                )}
+                {(staff.role === 'supervisor' || staff.role === 'manager') && (
+                  <p className="text-xs text-green-600 mt-2">
+                    ✅ You can update to any status including backwards transitions.
+                  </p>
+                )}
               </div>
 
               <div>

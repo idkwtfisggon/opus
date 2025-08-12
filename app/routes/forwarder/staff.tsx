@@ -369,7 +369,7 @@ function CreateStaffModal({
     const defaultPermissions = {
       warehouse_worker: {
         canUpdateOrderStatus: true,
-        canPrintLabels: false,
+        canPrintLabels: true,
         canScanBarcodes: true,
         canViewReports: false,
       },
