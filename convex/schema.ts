@@ -201,15 +201,109 @@ export default defineSchema({
     .index("by_tracking", ["trackingNumber"])
     .index("by_created", ["createdAt"]),
 
-  // Order status history for audit trail
-  orderHistory: defineTable({
+  // Staff accounts for warehouse operations
+  staff: defineTable({
+    forwarderId: v.string(), // Links to forwarders table
+    userId: v.string(), // Clerk auth ID
+    name: v.string(),
+    email: v.string(),
+    phone: v.optional(v.string()),
+    role: v.union(
+      v.literal("warehouse_worker"),
+      v.literal("supervisor"), 
+      v.literal("manager")
+    ),
+    assignedWarehouses: v.array(v.string()), // Array of warehouse IDs
+    permissions: v.object({
+      canUpdateOrderStatus: v.boolean(),
+      canPrintLabels: v.boolean(),
+      canScanBarcodes: v.boolean(),
+      canViewReports: v.boolean(),
+    }),
+    isActive: v.boolean(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_forwarder", ["forwarderId"])
+    .index("by_user", ["userId"])
+    .index("by_warehouse", ["assignedWarehouses"])
+    .index("by_active", ["forwarderId", "isActive"]),
+
+  // Enhanced order status history for audit trail with staff tracking
+  orderStatusHistory: defineTable({
     orderId: v.string(),
     previousStatus: v.optional(v.string()),
     newStatus: v.string(),
-    updatedBy: v.string(), // User ID who made the change
+    changedBy: v.string(), // Staff ID, forwarder ID, or "system"
+    changedByType: v.union(
+      v.literal("staff"),
+      v.literal("forwarder"),
+      v.literal("system")
+    ),
+    staffName: v.optional(v.string()), // Cache staff name for easy display
+    warehouseName: v.optional(v.string()), // Cache warehouse name
     notes: v.optional(v.string()),
+    scanData: v.optional(v.object({
+      barcodeValue: v.string(),
+      location: v.string(), // "Gate A", "Station 3", "Loading Bay"
+      deviceInfo: v.string(), // Device/browser info for debugging
+    })),
+    changedAt: v.number(),
+  }).index("by_order", ["orderId"])
+    .index("by_staff", ["changedBy"])
+    .index("by_timestamp", ["changedAt"])
+    .index("by_order_timestamp", ["orderId", "changedAt"]),
+
+  // Staff activity log for performance tracking
+  staffActivity: defineTable({
+    staffId: v.string(),
+    forwarderId: v.string(),
+    warehouseId: v.string(),
+    activityType: v.union(
+      v.literal("scan"),
+      v.literal("status_update"),
+      v.literal("login"),
+      v.literal("logout")
+    ),
+    orderId: v.optional(v.string()), // If related to specific order
+    details: v.optional(v.object({
+      oldStatus: v.optional(v.string()),
+      newStatus: v.optional(v.string()),
+      scanLocation: v.optional(v.string()),
+      processingTimeSeconds: v.optional(v.number()),
+    })),
     timestamp: v.number(),
-  }).index("by_order", ["orderId"]),
+  }).index("by_staff", ["staffId"])
+    .index("by_forwarder", ["forwarderId"])
+    .index("by_warehouse", ["warehouseId"])
+    .index("by_date", ["timestamp"])
+    .index("by_staff_date", ["staffId", "timestamp"]),
+
+  // Staff invite codes for joining warehouse teams
+  staffInvites: defineTable({
+    forwarderId: v.string(),
+    warehouseId: v.string(),
+    inviteCode: v.string(),
+    name: v.string(), // Name provided by forwarder
+    email: v.string(), // Email provided by forwarder
+    role: v.union(
+      v.literal("warehouse_worker"),
+      v.literal("supervisor"),
+      v.literal("manager")
+    ),
+    permissions: v.object({
+      canUpdateOrderStatus: v.boolean(),
+      canPrintLabels: v.boolean(),
+      canScanBarcodes: v.boolean(),
+      canViewReports: v.boolean(),
+    }),
+    isUsed: v.boolean(),
+    usedAt: v.optional(v.number()),
+    usedBy: v.optional(v.string()),
+    expiresAt: v.number(),
+    createdAt: v.number(),
+  }).index("by_code", ["inviteCode"])
+    .index("by_forwarder", ["forwarderId", "_creationTime"])
+    .index("by_active", ["isUsed", "expiresAt", "_creationTime"]),
 
   // Forwarder shipping zones and rates
   shippingZones: defineTable({

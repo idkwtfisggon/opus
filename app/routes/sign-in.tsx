@@ -4,6 +4,7 @@ import { useSearchParams } from "react-router";
 export default function SignInPage() {
   const [searchParams] = useSearchParams();
   const role = searchParams.get("role");
+  const redirectUrl = searchParams.get('redirect_url');
 
   return (
     <div className="flex items-center justify-center h-screen">
@@ -16,7 +17,8 @@ export default function SignInPage() {
           </div>
         )}
         <SignIn 
-          signUpUrl="/sign-up"
+          signUpUrl={redirectUrl ? `/sign-up?redirect_url=${encodeURIComponent(redirectUrl)}` : "/sign-up"}
+          afterSignInUrl={redirectUrl}
         />
       </div>
     </div>

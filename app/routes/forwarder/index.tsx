@@ -79,6 +79,21 @@ export default function ForwarderDashboard({ loaderData }: Route.ComponentProps)
       limit: 1000 // Get all orders to calculate current capacity
     } : "skip"
   );
+
+  // Get staff activity for the dashboard
+  const staffActivity = useQuery(
+    api.orderStatusHistory.getRecentStatusUpdates,
+    forwarder ? { 
+      forwarderId: forwarder._id,
+      limit: 10 // Show last 10 status updates
+    } : "skip"
+  );
+
+  // Get staff performance metrics
+  const staffMetrics = useQuery(
+    api.staff.getStaffPerformanceMetrics,
+    forwarder ? { forwarderId: forwarder._id } : "skip"
+  );
   
   // Timezone fix mutation - use the existing upsertForwarder instead
   const updateForwarder = useMutation(api.forwarders.upsertForwarder);
@@ -316,6 +331,87 @@ export default function ForwarderDashboard({ loaderData }: Route.ComponentProps)
         )}
       </div>
 
+      {/* Staff Activity Feed */}
+      {staffActivity && staffActivity.length > 0 && (
+        <div className="bg-card border border-border rounded-xl p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-semibold text-foreground">Recent Staff Activity</h3>
+            <a href="/forwarder/staff" 
+               className="text-primary hover:text-primary/80 font-medium text-sm transition-colors">
+              Manage Staff →
+            </a>
+          </div>
+          
+          <div className="space-y-3">
+            {staffActivity.map((activity) => (
+              <div key={activity._id} className="flex items-center justify-between p-3 bg-background border border-border rounded-lg">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-medium text-foreground text-sm">
+                      {activity.staffName || "Unknown Staff"}
+                    </span>
+                    <span className="text-xs text-muted-foreground">•</span>
+                    <span className="text-xs text-muted-foreground">
+                      {activity.warehouseName || "Unknown Warehouse"}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">
+                      {activity.order?.trackingNumber || "Unknown Order"}
+                    </span>
+                    <span className="text-xs text-muted-foreground">→</span>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      activity.newStatus === 'delivered' ? 'bg-green-100 text-green-800' :
+                      activity.newStatus === 'shipped' || activity.newStatus === 'in_transit' ? 'bg-blue-100 text-blue-800' :
+                      activity.newStatus === 'packed' ? 'bg-yellow-100 text-yellow-800' :
+                      'bg-gray-100 text-gray-800'
+                    }`}>
+                      {activity.newStatus.replace('_', ' ')}
+                    </span>
+                    {activity.scanData && (
+                      <span className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                        📱 {activity.scanData.location}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {new Date(activity.changedAt).toLocaleTimeString('en-SG', { 
+                    timeZone: 'Asia/Singapore',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+          
+          {/* Staff Metrics Summary */}
+          {staffMetrics && (
+            <div className="mt-4 pt-4 border-t border-border">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                <div>
+                  <div className="text-lg font-semibold text-foreground">{staffMetrics.totalStaff}</div>
+                  <div className="text-xs text-muted-foreground">Total Staff</div>
+                </div>
+                <div>
+                  <div className="text-lg font-semibold text-green-600">{staffMetrics.activeStaffToday}</div>
+                  <div className="text-xs text-muted-foreground">Active Today</div>
+                </div>
+                <div>
+                  <div className="text-lg font-semibold text-blue-600">{staffMetrics.totalScans}</div>
+                  <div className="text-xs text-muted-foreground">Total Scans</div>
+                </div>
+                <div>
+                  <div className="text-lg font-semibold text-purple-600">{staffMetrics.totalStatusUpdates}</div>
+                  <div className="text-xs text-muted-foreground">Status Updates</div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Quick Actions */}
       <div className="bg-card border border-border rounded-xl p-6">
         <h3 className="font-semibold text-lg mb-4 text-foreground">Quick Actions</h3>
@@ -330,6 +426,10 @@ export default function ForwarderDashboard({ loaderData }: Route.ComponentProps)
           <a href="/forwarder/orders" 
              className="border border-border bg-background text-foreground px-6 py-3 rounded-lg hover:bg-accent hover:text-accent-foreground font-medium shadow-sm transition-all duration-200 inline-block">
             View All Orders ({stats.totalOrders})
+          </a>
+          <a href="/forwarder/staff" 
+             className="border border-border bg-background text-foreground px-6 py-3 rounded-lg hover:bg-accent hover:text-accent-foreground font-medium shadow-sm transition-all duration-200 inline-block">
+            Manage Staff ({staffMetrics?.totalStaff || 0})
           </a>
         </div>
       </div>

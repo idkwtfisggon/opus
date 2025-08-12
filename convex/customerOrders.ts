@@ -258,13 +258,13 @@ export const createCustomerOrder = mutation({
     }
 
     // Get shipping rate details
-    const rate = await ctx.db.get(args.rateId);
+    const rate = await ctx.db.get(args.rateId as any) as any;
     if (!rate || !rate.isActive || !rate.isPublic) {
       throw new Error("Shipping option not available");
     }
 
     // Get forwarder and warehouse details
-    const forwarder = await ctx.db.get(rate.forwarderId);
+    const forwarder = await ctx.db.get(rate.forwarderId as any);
     if (!forwarder) throw new Error("Forwarder not found");
 
     // Get primary warehouse for this forwarder
@@ -279,7 +279,7 @@ export const createCustomerOrder = mutation({
     // Get shipping address
     let shippingAddress = customer.shippingAddress || "";
     if (args.shippingAddressId) {
-      const addressRecord = await ctx.db.get(args.shippingAddressId);
+      const addressRecord = await ctx.db.get(args.shippingAddressId as any) as any;
       if (addressRecord && addressRecord.customerId === customer._id) {
         shippingAddress = `${addressRecord.recipientName}\n${addressRecord.address}\n${addressRecord.city}, ${addressRecord.state} ${addressRecord.postalCode}\n${addressRecord.country}`;
       }
@@ -359,14 +359,14 @@ export const generateShippingAddress = query({
 
     if (!customer) return null;
 
-    const order = await ctx.db.get(args.orderId);
+    const order = await ctx.db.get(args.orderId as any) as any;
     if (!order || order.customerId !== customer._id) {
       throw new Error("Order not found");
     }
 
     // Get warehouse details
-    const warehouse = await ctx.db.get(order.warehouseId);
-    const forwarder = await ctx.db.get(order.forwarderId);
+    const warehouse = await ctx.db.get(order.warehouseId as any) as any;
+    const forwarder = await ctx.db.get(order.forwarderId as any) as any;
 
     if (!warehouse || !forwarder) {
       throw new Error("Warehouse or forwarder not found");

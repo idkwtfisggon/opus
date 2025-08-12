@@ -9,35 +9,38 @@ import { useAuth } from "@clerk/react-router";
 export async function loader(args: Route.LoaderArgs) {
   const { userId } = await getAuth(args);
   
+  console.log("🔍 FORWARDER LAYOUT LOADER - userId:", userId);
+  
   if (!userId) {
+    console.log("❌ No userId - redirecting to sign-in");
     return redirect("/sign-in");
   }
 
   try {
-    // Check if user exists and has forwarder role
-    const user = await fetchQuery(api.users.findUserByToken, { tokenIdentifier: userId });
+    console.log("🔍 Attempting to fetch forwarder for userId:", userId);
+    console.log("🔍 Available forwarders in DB:");
+    console.log("  - user_30t46oUNZB9yniLtgUDOcqa9sCS (benongyr@gmail.com)");
+    console.log("  - user_311q2JRtxFvJwOm8pKvTsojKrb3 (aredsnuff@gmail.com)");
     
-    if (user) {
-      if (user.role !== "forwarder") {
-        // Redirect to appropriate dashboard based on role
-        return redirect(`/${user.role}`);
-      }
-      return { user };
-    }
-    
-    // If no user record, check if they're an existing forwarder (legacy)
     const existingForwarder = await fetchQuery(api.forwarders.getForwarderByUserId, { userId });
     
+    console.log("🔍 Forwarder query result:", existingForwarder);
+    
     if (existingForwarder) {
-      // Allow access for existing forwarders
+      console.log("✅ Found existing forwarder for userId:", userId);
+      console.log("✅ Forwarder details:", JSON.stringify(existingForwarder, null, 2));
       return { user: { role: "forwarder" }, existingForwarder };
     }
+
+    console.log("❌ No forwarder found for userId:", userId);
+    console.log("❌ Redirecting to onboarding");
     
-    // No user or forwarder found, redirect to onboarding
+    // No forwarder found, redirect to onboarding
     return redirect("/onboarding");
     
   } catch (error) {
-    console.error("Error loading forwarder data:", error);
+    console.error("❌ Error loading forwarder data:", error);
+    console.error("❌ Error details:", JSON.stringify(error, null, 2));
     return redirect("/onboarding");
   }
 }
@@ -80,6 +83,22 @@ export default function ForwarderLayout() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
             </svg>
             Manage Orders
+          </a>
+          
+          <a href="/forwarder/staff" 
+             className="flex items-center px-3 py-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-lg transition-colors">
+            <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
+            Staff Management
+          </a>
+          
+          <a href="/forwarder/order-audit" 
+             className="flex items-center px-3 py-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-lg transition-colors">
+            <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            Order Audit
           </a>
           
           <a href="/forwarder/service-areas" 

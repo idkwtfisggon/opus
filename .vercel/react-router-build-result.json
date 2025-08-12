@@ -1,0 +1,594 @@
+{
+  "buildManifest": {
+    "serverBundles": {
+      "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0": {
+        "id": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+        "file": "build/server/nodejs_eyJydW50aW1lIjoibm9kZWpzIn0/index.js",
+        "config": {
+          "runtime": "nodejs"
+        }
+      }
+    },
+    "routeIdToServerBundleId": {
+      "routes/home": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/signup": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/onboarding": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/onboarding/customer": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/onboarding/forwarder": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/sign-in": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/sign-up": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/pricing": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/success": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/subscription-required": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/print-label": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/dashboard/index": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/dashboard/chat": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/dashboard/settings": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/customer/index": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/customer/orders": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/customer/create-order": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/customer/account": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/customer/settings": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/forwarder/index": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/forwarder/orders": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/forwarder/staff": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/forwarder/order-audit": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/forwarder/service-areas": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/forwarder/analytics": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/forwarder/settings": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/forwarder/account": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/staff/scanner": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/staff/orders": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/staff/activity": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/staff/profile": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0"
+    },
+    "routes": {
+      "root": {
+        "path": "",
+        "id": "root",
+        "file": "app/root.tsx",
+        "config": {}
+      },
+      "routes/home": {
+        "id": "routes/home",
+        "parentId": "root",
+        "file": "app/routes/home.tsx",
+        "index": true,
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/signup": {
+        "id": "routes/signup",
+        "parentId": "root",
+        "file": "app/routes/signup.tsx",
+        "path": "signup",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/onboarding": {
+        "id": "routes/onboarding",
+        "parentId": "root",
+        "file": "app/routes/onboarding.tsx",
+        "path": "onboarding",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/onboarding/customer": {
+        "id": "routes/onboarding/customer",
+        "parentId": "root",
+        "file": "app/routes/onboarding/customer.tsx",
+        "path": "onboarding/customer",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/onboarding/forwarder": {
+        "id": "routes/onboarding/forwarder",
+        "parentId": "root",
+        "file": "app/routes/onboarding/forwarder.tsx",
+        "path": "onboarding/forwarder",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/sign-in": {
+        "id": "routes/sign-in",
+        "parentId": "root",
+        "file": "app/routes/sign-in.tsx",
+        "path": "sign-in/*",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/sign-up": {
+        "id": "routes/sign-up",
+        "parentId": "root",
+        "file": "app/routes/sign-up.tsx",
+        "path": "sign-up/*",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/pricing": {
+        "id": "routes/pricing",
+        "parentId": "root",
+        "file": "app/routes/pricing.tsx",
+        "path": "pricing",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/success": {
+        "id": "routes/success",
+        "parentId": "root",
+        "file": "app/routes/success.tsx",
+        "path": "success",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/subscription-required": {
+        "id": "routes/subscription-required",
+        "parentId": "root",
+        "file": "app/routes/subscription-required.tsx",
+        "path": "subscription-required",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/print-label": {
+        "id": "routes/print-label",
+        "parentId": "root",
+        "file": "app/routes/print-label.tsx",
+        "path": "print-label",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/dashboard/layout": {
+        "id": "routes/dashboard/layout",
+        "parentId": "root",
+        "file": "app/routes/dashboard/layout.tsx",
+        "config": {}
+      },
+      "routes/dashboard/index": {
+        "id": "routes/dashboard/index",
+        "parentId": "routes/dashboard/layout",
+        "file": "app/routes/dashboard/index.tsx",
+        "path": "dashboard",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/dashboard/chat": {
+        "id": "routes/dashboard/chat",
+        "parentId": "routes/dashboard/layout",
+        "file": "app/routes/dashboard/chat.tsx",
+        "path": "dashboard/chat",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/dashboard/settings": {
+        "id": "routes/dashboard/settings",
+        "parentId": "routes/dashboard/layout",
+        "file": "app/routes/dashboard/settings.tsx",
+        "path": "dashboard/settings",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/customer/layout": {
+        "id": "routes/customer/layout",
+        "parentId": "root",
+        "file": "app/routes/customer/layout.tsx",
+        "config": {}
+      },
+      "routes/customer/index": {
+        "id": "routes/customer/index",
+        "parentId": "routes/customer/layout",
+        "file": "app/routes/customer/index.tsx",
+        "path": "customer",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/customer/orders": {
+        "id": "routes/customer/orders",
+        "parentId": "routes/customer/layout",
+        "file": "app/routes/customer/orders.tsx",
+        "path": "customer/orders",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/customer/create-order": {
+        "id": "routes/customer/create-order",
+        "parentId": "routes/customer/layout",
+        "file": "app/routes/customer/create-order.tsx",
+        "path": "customer/create-order",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/customer/account": {
+        "id": "routes/customer/account",
+        "parentId": "routes/customer/layout",
+        "file": "app/routes/customer/account.tsx",
+        "path": "customer/account",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/customer/settings": {
+        "id": "routes/customer/settings",
+        "parentId": "routes/customer/layout",
+        "file": "app/routes/customer/settings.tsx",
+        "path": "customer/settings",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/forwarder/layout": {
+        "id": "routes/forwarder/layout",
+        "parentId": "root",
+        "file": "app/routes/forwarder/layout.tsx",
+        "config": {}
+      },
+      "routes/forwarder/index": {
+        "id": "routes/forwarder/index",
+        "parentId": "routes/forwarder/layout",
+        "file": "app/routes/forwarder/index.tsx",
+        "path": "forwarder",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/forwarder/orders": {
+        "id": "routes/forwarder/orders",
+        "parentId": "routes/forwarder/layout",
+        "file": "app/routes/forwarder/orders.tsx",
+        "path": "forwarder/orders",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/forwarder/staff": {
+        "id": "routes/forwarder/staff",
+        "parentId": "routes/forwarder/layout",
+        "file": "app/routes/forwarder/staff.tsx",
+        "path": "forwarder/staff",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/forwarder/order-audit": {
+        "id": "routes/forwarder/order-audit",
+        "parentId": "routes/forwarder/layout",
+        "file": "app/routes/forwarder/order-audit.tsx",
+        "path": "forwarder/order-audit",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/forwarder/service-areas": {
+        "id": "routes/forwarder/service-areas",
+        "parentId": "routes/forwarder/layout",
+        "file": "app/routes/forwarder/service-areas.tsx",
+        "path": "forwarder/service-areas",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/forwarder/analytics": {
+        "id": "routes/forwarder/analytics",
+        "parentId": "routes/forwarder/layout",
+        "file": "app/routes/forwarder/analytics.tsx",
+        "path": "forwarder/analytics",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/forwarder/settings": {
+        "id": "routes/forwarder/settings",
+        "parentId": "routes/forwarder/layout",
+        "file": "app/routes/forwarder/settings.tsx",
+        "path": "forwarder/settings",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/forwarder/account": {
+        "id": "routes/forwarder/account",
+        "parentId": "routes/forwarder/layout",
+        "file": "app/routes/forwarder/account.tsx",
+        "path": "forwarder/account",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/staff/layout": {
+        "id": "routes/staff/layout",
+        "parentId": "root",
+        "file": "app/routes/staff/layout.tsx",
+        "config": {}
+      },
+      "routes/staff/scanner": {
+        "id": "routes/staff/scanner",
+        "parentId": "routes/staff/layout",
+        "file": "app/routes/staff/scanner.tsx",
+        "path": "staff/scanner",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/staff/orders": {
+        "id": "routes/staff/orders",
+        "parentId": "routes/staff/layout",
+        "file": "app/routes/staff/orders.tsx",
+        "path": "staff/orders",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/staff/activity": {
+        "id": "routes/staff/activity",
+        "parentId": "routes/staff/layout",
+        "file": "app/routes/staff/activity.tsx",
+        "path": "staff/activity",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/staff/profile": {
+        "id": "routes/staff/profile",
+        "parentId": "routes/staff/layout",
+        "file": "app/routes/staff/profile.tsx",
+        "path": "staff/profile",
+        "config": {
+          "runtime": "nodejs"
+        }
+      }
+    }
+  },
+  "reactRouterConfig": {
+    "appDirectory": "/Users/benong/Desktop/Opus1/app",
+    "basename": "/",
+    "buildDirectory": "/Users/benong/Desktop/Opus1/build",
+    "future": {
+      "unstable_middleware": false,
+      "unstable_optimizeDeps": false,
+      "unstable_splitRouteModules": false,
+      "unstable_subResourceIntegrity": false,
+      "unstable_viteEnvironmentApi": false
+    },
+    "routes": {
+      "root": {
+        "path": "",
+        "id": "root",
+        "file": "root.tsx"
+      },
+      "routes/home": {
+        "id": "routes/home",
+        "parentId": "root",
+        "file": "routes/home.tsx",
+        "index": true
+      },
+      "routes/signup": {
+        "id": "routes/signup",
+        "parentId": "root",
+        "file": "routes/signup.tsx",
+        "path": "signup"
+      },
+      "routes/onboarding": {
+        "id": "routes/onboarding",
+        "parentId": "root",
+        "file": "routes/onboarding.tsx",
+        "path": "onboarding"
+      },
+      "routes/onboarding/customer": {
+        "id": "routes/onboarding/customer",
+        "parentId": "root",
+        "file": "routes/onboarding/customer.tsx",
+        "path": "onboarding/customer"
+      },
+      "routes/onboarding/forwarder": {
+        "id": "routes/onboarding/forwarder",
+        "parentId": "root",
+        "file": "routes/onboarding/forwarder.tsx",
+        "path": "onboarding/forwarder"
+      },
+      "routes/sign-in": {
+        "id": "routes/sign-in",
+        "parentId": "root",
+        "file": "routes/sign-in.tsx",
+        "path": "sign-in/*"
+      },
+      "routes/sign-up": {
+        "id": "routes/sign-up",
+        "parentId": "root",
+        "file": "routes/sign-up.tsx",
+        "path": "sign-up/*"
+      },
+      "routes/pricing": {
+        "id": "routes/pricing",
+        "parentId": "root",
+        "file": "routes/pricing.tsx",
+        "path": "pricing"
+      },
+      "routes/success": {
+        "id": "routes/success",
+        "parentId": "root",
+        "file": "routes/success.tsx",
+        "path": "success"
+      },
+      "routes/subscription-required": {
+        "id": "routes/subscription-required",
+        "parentId": "root",
+        "file": "routes/subscription-required.tsx",
+        "path": "subscription-required"
+      },
+      "routes/print-label": {
+        "id": "routes/print-label",
+        "parentId": "root",
+        "file": "routes/print-label.tsx",
+        "path": "print-label"
+      },
+      "routes/dashboard/layout": {
+        "id": "routes/dashboard/layout",
+        "parentId": "root",
+        "file": "routes/dashboard/layout.tsx"
+      },
+      "routes/dashboard/index": {
+        "id": "routes/dashboard/index",
+        "parentId": "routes/dashboard/layout",
+        "file": "routes/dashboard/index.tsx",
+        "path": "dashboard"
+      },
+      "routes/dashboard/chat": {
+        "id": "routes/dashboard/chat",
+        "parentId": "routes/dashboard/layout",
+        "file": "routes/dashboard/chat.tsx",
+        "path": "dashboard/chat"
+      },
+      "routes/dashboard/settings": {
+        "id": "routes/dashboard/settings",
+        "parentId": "routes/dashboard/layout",
+        "file": "routes/dashboard/settings.tsx",
+        "path": "dashboard/settings"
+      },
+      "routes/customer/layout": {
+        "id": "routes/customer/layout",
+        "parentId": "root",
+        "file": "routes/customer/layout.tsx"
+      },
+      "routes/customer/index": {
+        "id": "routes/customer/index",
+        "parentId": "routes/customer/layout",
+        "file": "routes/customer/index.tsx",
+        "path": "customer"
+      },
+      "routes/customer/orders": {
+        "id": "routes/customer/orders",
+        "parentId": "routes/customer/layout",
+        "file": "routes/customer/orders.tsx",
+        "path": "customer/orders"
+      },
+      "routes/customer/create-order": {
+        "id": "routes/customer/create-order",
+        "parentId": "routes/customer/layout",
+        "file": "routes/customer/create-order.tsx",
+        "path": "customer/create-order"
+      },
+      "routes/customer/account": {
+        "id": "routes/customer/account",
+        "parentId": "routes/customer/layout",
+        "file": "routes/customer/account.tsx",
+        "path": "customer/account"
+      },
+      "routes/customer/settings": {
+        "id": "routes/customer/settings",
+        "parentId": "routes/customer/layout",
+        "file": "routes/customer/settings.tsx",
+        "path": "customer/settings"
+      },
+      "routes/forwarder/layout": {
+        "id": "routes/forwarder/layout",
+        "parentId": "root",
+        "file": "routes/forwarder/layout.tsx"
+      },
+      "routes/forwarder/index": {
+        "id": "routes/forwarder/index",
+        "parentId": "routes/forwarder/layout",
+        "file": "routes/forwarder/index.tsx",
+        "path": "forwarder"
+      },
+      "routes/forwarder/orders": {
+        "id": "routes/forwarder/orders",
+        "parentId": "routes/forwarder/layout",
+        "file": "routes/forwarder/orders.tsx",
+        "path": "forwarder/orders"
+      },
+      "routes/forwarder/staff": {
+        "id": "routes/forwarder/staff",
+        "parentId": "routes/forwarder/layout",
+        "file": "routes/forwarder/staff.tsx",
+        "path": "forwarder/staff"
+      },
+      "routes/forwarder/order-audit": {
+        "id": "routes/forwarder/order-audit",
+        "parentId": "routes/forwarder/layout",
+        "file": "routes/forwarder/order-audit.tsx",
+        "path": "forwarder/order-audit"
+      },
+      "routes/forwarder/service-areas": {
+        "id": "routes/forwarder/service-areas",
+        "parentId": "routes/forwarder/layout",
+        "file": "routes/forwarder/service-areas.tsx",
+        "path": "forwarder/service-areas"
+      },
+      "routes/forwarder/analytics": {
+        "id": "routes/forwarder/analytics",
+        "parentId": "routes/forwarder/layout",
+        "file": "routes/forwarder/analytics.tsx",
+        "path": "forwarder/analytics"
+      },
+      "routes/forwarder/settings": {
+        "id": "routes/forwarder/settings",
+        "parentId": "routes/forwarder/layout",
+        "file": "routes/forwarder/settings.tsx",
+        "path": "forwarder/settings"
+      },
+      "routes/forwarder/account": {
+        "id": "routes/forwarder/account",
+        "parentId": "routes/forwarder/layout",
+        "file": "routes/forwarder/account.tsx",
+        "path": "forwarder/account"
+      },
+      "routes/staff/layout": {
+        "id": "routes/staff/layout",
+        "parentId": "root",
+        "file": "routes/staff/layout.tsx"
+      },
+      "routes/staff/scanner": {
+        "id": "routes/staff/scanner",
+        "parentId": "routes/staff/layout",
+        "file": "routes/staff/scanner.tsx",
+        "path": "staff/scanner"
+      },
+      "routes/staff/orders": {
+        "id": "routes/staff/orders",
+        "parentId": "routes/staff/layout",
+        "file": "routes/staff/orders.tsx",
+        "path": "staff/orders"
+      },
+      "routes/staff/activity": {
+        "id": "routes/staff/activity",
+        "parentId": "routes/staff/layout",
+        "file": "routes/staff/activity.tsx",
+        "path": "staff/activity"
+      },
+      "routes/staff/profile": {
+        "id": "routes/staff/profile",
+        "parentId": "routes/staff/layout",
+        "file": "routes/staff/profile.tsx",
+        "path": "staff/profile"
+      }
+    },
+    "routeDiscovery": {
+      "mode": "lazy",
+      "manifestPath": "/__manifest"
+    },
+    "serverBuildFile": "index.js",
+    "serverModuleFormat": "esm",
+    "ssr": true
+  },
+  "viteConfig": {
+    "build": {
+      "assetsDir": "assets"
+    }
+  }
+}

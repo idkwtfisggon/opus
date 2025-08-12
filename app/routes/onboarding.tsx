@@ -2,7 +2,7 @@ import { getAuth } from "@clerk/react-router/ssr.server";
 import { fetchQuery } from "convex/nextjs";
 import { redirect } from "react-router";
 import type { Route } from "./+types/onboarding";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useSearchParams, useNavigate } from "react-router";
 import { useEffect, useState } from "react";
@@ -27,6 +27,31 @@ export default function OnboardingPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const role = searchParams.get("role");
+  
+  // Check if user is already a staff member or forwarder
+  const staff = useQuery(
+    api.staff.getStaffByUserId, 
+    user?.id ? { userId: user.id } : "skip"
+  );
+  
+  const forwarder = useQuery(
+    api.forwarders.getForwarderByUserId,
+    user?.id ? { userId: user.id } : "skip"
+  );
+  
+  // Redirect existing users to their dashboards
+  useEffect(() => {
+    if (user?.id) {
+      if (staff) {
+        window.location.href = "/staff";
+        return;
+      }
+      if (forwarder) {
+        window.location.href = "/forwarder";
+        return;
+      }
+    }
+  }, [user, staff, forwarder]);
   
   const [isLoading, setIsLoading] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
