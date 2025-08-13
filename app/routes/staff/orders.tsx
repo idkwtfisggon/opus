@@ -1,7 +1,7 @@
 import { getAuth } from "@clerk/react-router/ssr.server";
 import { fetchQuery } from "convex/nextjs";
 import { api } from "../../../convex/_generated/api";
-import { useQuery } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
 import { useState } from "react";
 
 export async function loader(args: any) {
@@ -36,6 +36,10 @@ export async function loader(args: any) {
 export default function StaffOrders({ loaderData }: any) {
   const { staff } = loaderData;
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
+
+  // Mutations
+  const updateOrderStatus = useMutation(api.staff.updateOrderStatus);
 
   // Get orders for this staff member
   const orders = useQuery(
@@ -67,6 +71,32 @@ export default function StaffOrders({ loaderData }: any) {
       hour: '2-digit',
       minute: '2-digit'
     });
+  };
+
+  const handleStatusUpdate = async (orderId: string, newStatus: string, orderTrackingNumber: string) => {
+    if (updatingOrderId) return; // Prevent multiple simultaneous updates
+    
+    setUpdatingOrderId(orderId);
+    
+    try {
+      await updateOrderStatus({
+        orderId,
+        newStatus,
+        staffId: staff._id,
+        notes: `Updated via orders page by ${staff.name}`,
+        scanData: {
+          barcodeValue: orderTrackingNumber,
+          location: "Orders Page",
+          deviceInfo: `${navigator.userAgent} - ${new Date().toISOString()}`,
+        }
+      });
+      
+      // Success feedback could be added here (toast notification, etc.)
+    } catch (error: any) {
+      alert(`Failed to update order: ${error.message}`);
+    } finally {
+      setUpdatingOrderId(null);
+    }
   };
 
   if (!orders) {
@@ -120,9 +150,19 @@ export default function StaffOrders({ loaderData }: any) {
         {/* Orders List */}
         <div className="bg-card border border-border rounded-xl">
           <div className="p-4 border-b border-border">
-            <h2 className="text-lg font-semibold text-foreground">
-              Orders ({orders.length})
-            </h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-foreground">
+                Orders ({orders.length})
+              </h2>
+              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                staff.role === 'manager' ? 'bg-purple-100 text-purple-800' :
+                staff.role === 'supervisor' ? 'bg-blue-100 text-blue-800' :
+                'bg-green-100 text-green-800'
+              }`}>
+                {staff.role.replace('_', ' ')}
+                {staff.role === 'warehouse_worker' && ' (Forward-only)'}
+              </span>
+            </div>
           </div>
 
           {orders.length === 0 ? (
@@ -179,6 +219,21 @@ export default function StaffOrders({ loaderData }: any) {
                           Packed {formatDate(order.packedAt)}
                         </div>
                       )}
+                      {order.awaitingPickupAt && (
+                        <div className="text-xs text-muted-foreground">
+                          Awaiting Pickup {formatDate(order.awaitingPickupAt)}
+                        </div>
+                      )}
+                      {order.shippedAt && (
+                        <div className="text-xs text-muted-foreground">
+                          Shipped {formatDate(order.shippedAt)}
+                        </div>
+                      )}
+                      {order.deliveredAt && (
+                        <div className="text-xs text-muted-foreground">
+                          Delivered {formatDate(order.deliveredAt)}
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -190,14 +245,61 @@ export default function StaffOrders({ loaderData }: any) {
                     >
                       📱 Scan Package
                     </a>
-                    {order.status === "arrived_at_warehouse" && (
-                      <button className="bg-yellow-100 text-yellow-800 px-3 py-2 rounded-md text-sm font-medium hover:bg-yellow-200 transition-colors">
-                        Mark as Packed
+                    
+                    {/* Status Update Buttons */}
+                    {order.status === "incoming" && (
+                      <button 
+                        onClick={() => handleStatusUpdate(order._id, "arrived_at_warehouse", order.trackingNumber)}
+                        disabled={updatingOrderId === order._id}
+                        className="bg-blue-100 text-blue-800 px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-200 transition-colors disabled:opacity-50"
+                      >
+                        {updatingOrderId === order._id ? "Updating..." : "Arrived in Premise"}
                       </button>
                     )}
+                    
+                    {order.status === "arrived_at_warehouse" && (
+                      <button 
+                        onClick={() => handleStatusUpdate(order._id, "packed", order.trackingNumber)}
+                        disabled={updatingOrderId === order._id}
+                        className="bg-yellow-100 text-yellow-800 px-3 py-2 rounded-md text-sm font-medium hover:bg-yellow-200 transition-colors disabled:opacity-50"
+                      >
+                        {updatingOrderId === order._id ? "Updating..." : "Mark as Packed"}
+                      </button>
+                    )}
+                    
                     {order.status === "packed" && (
-                      <button className="bg-purple-100 text-purple-800 px-3 py-2 rounded-md text-sm font-medium hover:bg-purple-200 transition-colors">
-                        Ready for Pickup
+                      <button 
+                        onClick={() => handleStatusUpdate(order._id, "awaiting_pickup", order.trackingNumber)}
+                        disabled={updatingOrderId === order._id}
+                        className="bg-purple-100 text-purple-800 px-3 py-2 rounded-md text-sm font-medium hover:bg-purple-200 transition-colors disabled:opacity-50"
+                      >
+                        {updatingOrderId === order._id ? "Updating..." : "Awaiting Pickup"}
+                      </button>
+                    )}
+                    
+                    {order.status === "awaiting_pickup" && (
+                      <button 
+                        onClick={() => handleStatusUpdate(order._id, "in_transit", order.trackingNumber)}
+                        disabled={updatingOrderId === order._id}
+                        className="bg-indigo-100 text-indigo-800 px-3 py-2 rounded-md text-sm font-medium hover:bg-indigo-200 transition-colors disabled:opacity-50"
+                      >
+                        {updatingOrderId === order._id ? "Updating..." : "Delivery in Progress"}
+                      </button>
+                    )}
+                    
+                    {order.status === "in_transit" && (
+                      <button 
+                        onClick={() => handleStatusUpdate(order._id, "delivered", order.trackingNumber)}
+                        disabled={updatingOrderId === order._id}
+                        className="bg-green-100 text-green-800 px-3 py-2 rounded-md text-sm font-medium hover:bg-green-200 transition-colors disabled:opacity-50"
+                      >
+                        {updatingOrderId === order._id ? "Updating..." : "Arrived at Destination"}
+                      </button>
+                    )}
+                    
+                    {staff.permissions.canPrintLabels && (
+                      <button className="bg-gray-100 text-gray-800 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-200 transition-colors">
+                        🖨️ Print Label
                       </button>
                     )}
                   </div>

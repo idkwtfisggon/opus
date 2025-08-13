@@ -191,6 +191,7 @@ export default defineSchema({
     createdAt: v.number(),
     receivedAt: v.optional(v.number()),
     packedAt: v.optional(v.number()),
+    awaitingPickupAt: v.optional(v.number()),
     shippedAt: v.optional(v.number()),
     deliveredAt: v.optional(v.number()),
     updatedAt: v.number(),
@@ -283,8 +284,8 @@ export default defineSchema({
     forwarderId: v.string(),
     warehouseId: v.string(),
     inviteCode: v.string(),
-    name: v.string(), // Name provided by forwarder
-    email: v.string(), // Email provided by forwarder
+    name: v.optional(v.string()), // Name provided by forwarder
+    email: v.optional(v.string()), // Email provided by forwarder
     role: v.union(
       v.literal("warehouse_worker"),
       v.literal("supervisor"),
@@ -302,8 +303,8 @@ export default defineSchema({
     expiresAt: v.number(),
     createdAt: v.number(),
   }).index("by_code", ["inviteCode"])
-    .index("by_forwarder", ["forwarderId", "_creationTime"])
-    .index("by_active", ["isUsed", "expiresAt", "_creationTime"]),
+    .index("by_forwarder", ["forwarderId"])
+    .index("by_active", ["isUsed", "expiresAt"]),
 
   // Forwarder shipping zones and rates
   shippingZones: defineTable({

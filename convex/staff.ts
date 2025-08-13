@@ -459,14 +459,13 @@ export const joinWithInviteCode = mutation({
 });
 
 // Status progression helper - defines valid status transitions
+// Flow: incoming → arrived_at_warehouse → packed → awaiting_pickup → in_transit → delivered
 const STATUS_PROGRESSION = {
-  "incoming": ["arrived_at_warehouse", "received"], // received is legacy but allowed
-  "received": ["arrived_at_warehouse", "packed"], // legacy status
-  "arrived_at_warehouse": ["packed"],
+  "incoming": ["arrived_at_warehouse"],
+  "arrived_at_warehouse": ["packed"], // arrived in premise
   "packed": ["awaiting_pickup"],
-  "awaiting_pickup": ["shipped", "in_transit"], // shipped is legacy but allowed
-  "shipped": ["in_transit", "delivered"], // legacy status
-  "in_transit": ["delivered"],
+  "awaiting_pickup": ["in_transit"], // delivery in progress  
+  "in_transit": ["delivered"], // arrived at destination
   "delivered": [] // Final status
 };
 
@@ -543,16 +542,36 @@ export const updateOrderStatus = mutation({
       throw new Error(validation.reason || "Invalid status transition");
     }
 
-    // Update the order status
-    await ctx.db.patch(args.orderId as any, {
+    // Check if this is a forward progression or a reversal
+    const statusOrder = ["incoming", "arrived_at_warehouse", "packed", "awaiting_pickup", "in_transit", "delivered"];
+    const currentIndex = statusOrder.indexOf(order.status);
+    const newIndex = statusOrder.indexOf(args.newStatus);
+    const isForwardProgression = newIndex > currentIndex;
+
+    // Prepare update object
+    const updateData: any = {
       status: args.newStatus,
       updatedAt: Date.now(),
-      // Update specific timestamp fields based on new status
-      ...(args.newStatus === "arrived_at_warehouse" || args.newStatus === "received" ? { receivedAt: Date.now() } : {}),
-      ...(args.newStatus === "packed" ? { packedAt: Date.now() } : {}),
-      ...(args.newStatus === "shipped" || args.newStatus === "in_transit" ? { shippedAt: Date.now() } : {}),
-      ...(args.newStatus === "delivered" ? { deliveredAt: Date.now() } : {}),
-    });
+    };
+
+    // Only update timestamps for forward progressions, not reversals
+    if (isForwardProgression) {
+      if (args.newStatus === "arrived_at_warehouse" || args.newStatus === "received") {
+        updateData.receivedAt = Date.now();
+      } else if (args.newStatus === "packed") {
+        updateData.packedAt = Date.now();
+      } else if (args.newStatus === "awaiting_pickup") {
+        updateData.awaitingPickupAt = Date.now();
+      } else if (args.newStatus === "shipped" || args.newStatus === "in_transit") {
+        updateData.shippedAt = Date.now();
+      } else if (args.newStatus === "delivered") {
+        updateData.deliveredAt = Date.now();
+      }
+    }
+    // For reversals, we preserve the original timestamps
+
+    // Update the order status
+    await ctx.db.patch(args.orderId as any, updateData);
 
     // Log the status change in order history
     await ctx.db.insert("orderStatusHistory", {
@@ -563,7 +582,7 @@ export const updateOrderStatus = mutation({
       changedByType: "staff",
       staffName: staff.name,
       warehouseName: order.warehouseId, // Will be resolved later if needed
-      notes: args.notes,
+      notes: isForwardProgression ? args.notes : `${args.notes} (Status reversal by ${staff.role})`,
       scanData: args.scanData,
       changedAt: Date.now(),
     });

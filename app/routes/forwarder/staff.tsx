@@ -341,7 +341,7 @@ function CreateStaffModal({
     warehouseId: "",
     permissions: {
       canUpdateOrderStatus: true,
-      canPrintLabels: false,
+      canPrintLabels: true,
       canScanBarcodes: true,
       canViewReports: false,
     }
