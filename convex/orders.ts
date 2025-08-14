@@ -279,23 +279,22 @@ export const createOrder = mutation({
   },
 });
 
-// Update order status
+// Update order status (admin version with more parameters)
 export const updateOrderStatus = mutation({
   args: {
-    orderId: v.id("orders"),
-    newStatus: v.union(
-      v.literal("incoming"),
-      v.literal("arrived_at_warehouse"),
-      v.literal("packed"),
-      v.literal("awaiting_pickup"),
-      v.literal("in_transit"),
-      v.literal("delivered")
-    ),
-    updatedBy: v.string(),
+    orderId: v.string(),
+    newStatus: v.string(),
     notes: v.optional(v.string()),
+    changedBy: v.string(),
+    changedByType: v.string(),
+    scanData: v.optional(v.object({
+      barcodeValue: v.string(),
+      location: v.string(),
+      deviceInfo: v.string(),
+    })),
   },
-  handler: async (ctx, { orderId, newStatus, updatedBy, notes }) => {
-    const order = await ctx.db.get(orderId);
+  handler: async (ctx, { orderId, newStatus, notes, changedBy, changedByType, scanData }) => {
+    const order = await ctx.db.get(orderId as any);
     if (!order) throw new Error("Order not found");
 
     const now = Date.now();
@@ -312,25 +311,29 @@ export const updateOrderStatus = mutation({
       updateData.receivedAt = now;
     } else if (newStatus === "packed" && !order.packedAt) {
       updateData.packedAt = now;
+    } else if (newStatus === "awaiting_pickup" && !order.awaitingPickupAt) {
+      updateData.awaitingPickupAt = now;
     } else if (newStatus === "in_transit" && !order.shippedAt) {
       updateData.shippedAt = now;
     } else if (newStatus === "delivered" && !order.deliveredAt) {
       updateData.deliveredAt = now;
     }
 
-    await ctx.db.patch(orderId, updateData);
+    await ctx.db.patch(orderId as any, updateData);
 
     // Create history entry
-    await ctx.db.insert("orderHistory", {
+    await ctx.db.insert("orderStatusHistory", {
       orderId,
       previousStatus,
       newStatus,
-      updatedBy,
-      notes,
-      timestamp: now,
+      changedBy,
+      changedByType,
+      notes: notes || `Status updated by ${changedByType}`,
+      scanData,
+      changedAt: now,
     });
 
-    return orderId;
+    return { success: true, previousStatus, newStatus };
   },
 });
 
@@ -456,5 +459,22 @@ export const getOrderVolume = query({
     });
 
     return volumeByDate;
+  },
+});
+
+// Simple function to get all orders for a forwarder (for dropdowns, QR generator, etc.)
+export const getOrdersForForwarder = query({
+  args: { 
+    forwarderId: v.string(),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, { forwarderId, limit = 100 }) => {
+    const orders = await ctx.db
+      .query("orders")
+      .withIndex("by_forwarder", (q) => q.eq("forwarderId", forwarderId))
+      .order("desc")
+      .take(limit);
+
+    return orders;
   },
 });

@@ -245,3 +245,123 @@ export const clearTestData = mutation({
     return { message: "Test data cleared successfully" };
   },
 });
+
+// Seed test orders for QR code testing
+export const seedTestOrders = mutation({
+  args: {
+    forwarderId: v.string(),
+    warehouseId: v.string(),
+  },
+  handler: async (ctx, { forwarderId, warehouseId }) => {
+    const now = Date.now();
+    
+    // Sample tracking numbers that match QR generator defaults
+    const testOrders = [
+      {
+        trackingNumber: "SG123456789",
+        customerName: "John Doe",
+        merchantName: "Test Store",
+        status: "incoming",
+        declaredWeight: 2.5,
+        declaredValue: 150,
+        currency: "SGD",
+      },
+      {
+        trackingNumber: "SG987654321", 
+        customerName: "Jane Smith",
+        merchantName: "Demo Shop",
+        status: "arrived_at_warehouse",
+        declaredWeight: 1.2,
+        declaredValue: 89.99,
+        currency: "SGD",
+      },
+      {
+        trackingNumber: "SG555666777",
+        customerName: "Bob Wilson", 
+        merchantName: "Sample Store",
+        status: "packed",
+        declaredWeight: 3.1,
+        declaredValue: 299.50,
+        currency: "SGD",
+      },
+      {
+        trackingNumber: "SG111222333",
+        customerName: "Alice Johnson",
+        merchantName: "Test Merchant",
+        status: "awaiting_pickup", 
+        declaredWeight: 0.8,
+        declaredValue: 45.00,
+        currency: "SGD",
+      }
+    ];
+
+    const orderIds = [];
+
+    for (const orderData of testOrders) {
+      const orderId = await ctx.db.insert("orders", {
+        ...orderData,
+        forwarderId,
+        warehouseId,
+        customerEmail: `${orderData.customerName.toLowerCase().replace(' ', '.')}@test.com`,
+        merchantEmail: `${orderData.merchantName.toLowerCase().replace(' ', '.')}@merchant.com`,
+        shippingAddress: {
+          street: "123 Test Street",
+          city: "Singapore",
+          state: "Singapore",
+          country: "Singapore",
+          postalCode: "123456"
+        },
+        dimensions: {
+          length: 20,
+          width: 15,
+          height: 10
+        },
+        specialInstructions: orderData.status === "awaiting_pickup" ? "Handle with care - fragile items" : undefined,
+        createdAt: now - (Math.random() * 24 * 60 * 60 * 1000), // Random time in last 24h
+        updatedAt: now,
+        // Add timestamps based on status
+        receivedAt: orderData.status !== "incoming" ? now - (Math.random() * 12 * 60 * 60 * 1000) : undefined,
+        packedAt: ["packed", "awaiting_pickup"].includes(orderData.status) ? now - (Math.random() * 6 * 60 * 60 * 1000) : undefined,
+        awaitingPickupAt: orderData.status === "awaiting_pickup" ? now - (Math.random() * 2 * 60 * 60 * 1000) : undefined,
+      });
+      
+      orderIds.push(orderId);
+    }
+
+    return {
+      success: true,
+      message: `Created ${testOrders.length} test orders`,
+      orderIds,
+      trackingNumbers: testOrders.map(o => o.trackingNumber)
+    };
+  },
+});
+
+// Clean up test orders
+export const cleanupTestOrders = mutation({
+  args: {
+    forwarderId: v.string(),
+  },
+  handler: async (ctx, { forwarderId }) => {
+    const testTrackingNumbers = ["SG123456789", "SG987654321", "SG555666777", "SG111222333"];
+    
+    const orders = await ctx.db
+      .query("orders")
+      .withIndex("by_forwarder", (q) => q.eq("forwarderId", forwarderId))
+      .collect();
+
+    const testOrders = orders.filter(order => 
+      testTrackingNumbers.includes(order.trackingNumber)
+    );
+
+    for (const order of testOrders) {
+      await ctx.db.delete(order._id);
+    }
+
+    return {
+      success: true,
+      message: `Deleted ${testOrders.length} test orders`,
+      deletedTrackingNumbers: testOrders.map(o => o.trackingNumber)
+    };
+  },
+});

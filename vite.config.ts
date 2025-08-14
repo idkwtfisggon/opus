@@ -6,6 +6,8 @@ import tsconfigPaths from "vite-tsconfig-paths";
 export default defineConfig({
   plugins: [tailwindcss(), reactRouter(), tsconfigPaths()],
   server: {
+    host: true, // Listen on all addresses including network
+    port: 5173,
     hmr: {
       port: 5173,
     },

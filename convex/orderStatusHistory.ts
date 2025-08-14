@@ -299,3 +299,46 @@ export const getStatusUpdateStats = query({
     };
   },
 });
+
+// Log forwarder scan (for admin scanner)
+export const logForwarderScan = mutation({
+  args: {
+    forwarderId: v.string(),
+    orderId: v.string(),
+    scanData: v.object({
+      barcodeValue: v.string(),
+      location: v.string(),
+      deviceInfo: v.string(),
+    }),
+    notes: v.optional(v.string()),
+  },
+  handler: async (ctx, { forwarderId, orderId, scanData, notes }) => {
+    const now = Date.now();
+
+    // Get order and forwarder details
+    const [order, forwarder] = await Promise.all([
+      ctx.db.get(orderId as any),
+      ctx.db.get(forwarderId as any)
+    ]);
+
+    if (!order || !forwarder) {
+      throw new Error("Order or forwarder not found");
+    }
+
+    // Create a history entry for the scan
+    const historyId = await ctx.db.insert("orderStatusHistory", {
+      orderId,
+      previousStatus: order.status,
+      newStatus: order.status, // Same status
+      changedBy: forwarderId,
+      changedByType: "forwarder",
+      staffName: forwarder.businessName,
+      warehouseName: (await ctx.db.get(order.warehouseId as any))?.name,
+      notes: notes || "Package scanned by admin",
+      scanData,
+      changedAt: now,
+    });
+
+    return { historyId };
+  },
+});

@@ -19,6 +19,7 @@ export default [
   route("success", "routes/success.tsx"),
   route("subscription-required", "routes/subscription-required.tsx"),
   route("print-label", "routes/print-label.tsx"),
+  route("seed-data", "routes/seed-data.tsx"),
   layout("routes/dashboard/layout.tsx", [
     route("dashboard", "routes/dashboard/index.tsx"),
     route("dashboard/chat", "routes/dashboard/chat.tsx"),
@@ -37,6 +38,8 @@ export default [
     route("forwarder", "routes/forwarder/index.tsx"),
     route("forwarder/orders", "routes/forwarder/orders.tsx"),
     route("forwarder/staff", "routes/forwarder/staff.tsx"),
+    route("forwarder/scanner", "routes/forwarder/scanner.tsx"),
+    route("forwarder/qr-generator", "routes/forwarder/qr-generator.tsx"),
     route("forwarder/order-audit", "routes/forwarder/order-audit.tsx"),
     route("forwarder/service-areas", "routes/forwarder/service-areas.tsx"),
     route("forwarder/analytics", "routes/forwarder/analytics.tsx"),

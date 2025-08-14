@@ -235,6 +235,198 @@ export const getOrdersForStaff = query({
   },
 });
 
+// Debug query to find orders by tracking number OR order ID (for troubleshooting)
+export const findOrderByTrackingNumber = query({
+  args: { 
+    trackingNumber: v.string(),
+    orderId: v.optional(v.string()),
+    forwarderId: v.string()
+  },
+  handler: async (ctx, { trackingNumber, orderId, forwarderId }) => {
+    const orders = await ctx.db
+      .query("orders")
+      .withIndex("by_forwarder", (q) => q.eq("forwarderId", forwarderId))
+      .collect();
+
+    const matchingOrders = orders.filter(order => 
+      order.trackingNumber === trackingNumber ||
+      (orderId && order._id === orderId)
+    );
+
+    if (matchingOrders.length === 0) {
+      return { 
+        found: false, 
+        message: "No orders with this tracking number or ID",
+        totalOrdersInForwarder: orders.length,
+        searchedFor: { trackingNumber, orderId }
+      };
+    }
+
+    const order = matchingOrders[0];
+    const warehouse = await ctx.db.get(order.warehouseId as any);
+
+    return {
+      found: true,
+      order: {
+        _id: order._id,
+        trackingNumber: order.trackingNumber,
+        customerName: order.customerName,
+        status: order.status,
+        forwarderId: order.forwarderId
+      },
+      warehouseName: warehouse?.name || "Unknown",
+      warehouseId: order.warehouseId
+    };
+  },
+});
+
+// Find order anywhere in the system (ignore forwarder)
+export const findOrderAnywhere = query({
+  args: { 
+    trackingNumber: v.string(),
+    orderId: v.optional(v.string())
+  },
+  handler: async (ctx, { trackingNumber, orderId }) => {
+    const orders = await ctx.db
+      .query("orders")
+      .collect();
+
+    const matchingOrder = orders.find(order => 
+      order.trackingNumber === trackingNumber ||
+      (orderId && order._id === orderId)
+    );
+
+    if (!matchingOrder) {
+      return { found: false, totalOrders: orders.length };
+    }
+
+    const warehouse = await ctx.db.get(matchingOrder.warehouseId as any);
+
+    return {
+      found: true,
+      order: {
+        trackingNumber: matchingOrder.trackingNumber,
+        forwarderId: matchingOrder.forwarderId,
+        warehouseId: matchingOrder.warehouseId
+      },
+      warehouseName: warehouse?.name || "Unknown"
+    };
+  },
+});
+
+// Direct order lookup by ID or tracking number
+export const directOrderLookup = query({
+  args: { 
+    orderId: v.optional(v.string()),
+    trackingNumber: v.optional(v.string())
+  },
+  handler: async (ctx, { orderId, trackingNumber }) => {
+    try {
+      let order = null;
+      
+      if (orderId) {
+        order = await ctx.db.get(orderId as any);
+      }
+      
+      if (!order && trackingNumber) {
+        const orders = await ctx.db.query("orders").collect();
+        order = orders.find(o => o.trackingNumber === trackingNumber);
+      }
+      
+      if (!order) {
+        const allOrders = await ctx.db.query("orders").collect();
+        return { 
+          found: false, 
+          totalOrders: allOrders.length,
+          searchedFor: { orderId, trackingNumber }
+        };
+      }
+      
+      const warehouse = await ctx.db.get(order.warehouseId as any);
+      
+      return {
+        found: true,
+        order: {
+          _id: order._id,
+          trackingNumber: order.trackingNumber,
+          forwarderId: order.forwarderId,
+          warehouseId: order.warehouseId,
+          customerName: order.customerName
+        },
+        warehouse: {
+          _id: warehouse?._id,
+          name: warehouse?.name
+        }
+      };
+    } catch (error) {
+      return { error: error.message };
+    }
+  },
+});
+
+// Debug staff warehouse assignments vs actual orders
+export const debugStaffWarehouseAssignments = query({
+  args: { staffId: v.string() },
+  handler: async (ctx, { staffId }) => {
+    try {
+      const staff = await ctx.db.get(staffId as any);
+      if (!staff) return { error: "Staff not found" };
+
+      // Get all orders for this forwarder
+      const allOrders = await ctx.db
+        .query("orders")
+        .withIndex("by_forwarder", (q) => q.eq("forwarderId", staff.forwarderId))
+        .collect();
+
+      // Get unique warehouse IDs from orders
+      const orderWarehouseIds = [...new Set(allOrders.map(o => o.warehouseId))];
+
+      // Get warehouse names
+      const warehouses = await Promise.all(
+        orderWarehouseIds.map(async (id) => {
+          try {
+            const w = await ctx.db.get(id as any);
+            return { id, name: w?.name || "Unknown" };
+          } catch (e) {
+            return { id, name: "Error loading" };
+          }
+        })
+      );
+
+      // Get staff assigned warehouse names
+      const assignedWarehouses = await Promise.all(
+        staff.assignedWarehouses.map(async (id) => {
+          try {
+            const w = await ctx.db.get(id as any);
+            return { id, name: w?.name || "Unknown" };
+          } catch (e) {
+            return { id, name: "Error loading" };
+          }
+        })
+      );
+
+      return {
+        staffId: staff._id,
+        staffName: staff.name,
+        forwarderId: staff.forwarderId,
+        totalOrdersInForwarder: allOrders.length,
+        assignedWarehouses,
+        orderWarehouses: warehouses,
+        warehouseIdMatch: staff.assignedWarehouses.some(id => 
+          orderWarehouseIds.includes(id)
+        ),
+        rawStaffWarehouses: staff.assignedWarehouses,
+        rawOrderWarehouses: orderWarehouseIds
+      };
+    } catch (error) {
+      return { 
+        error: `Debug query failed: ${error.message}`,
+        staffId 
+      };
+    }
+  },
+});
+
 // Get staff activity for a forwarder (admin view)
 export const getStaffActivity = query({
   args: { 

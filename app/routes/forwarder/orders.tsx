@@ -148,17 +148,23 @@ export default function ManageOrders({ loaderData }: Route.ComponentProps) {
     
     try {
       await updateOrderStatus({
-        orderId: orderId as any, // Convex ID type
-        newStatus: newStatus as any, // Status enum type
-        updatedBy: forwarder._id,
-        notes: `Status updated via dashboard`
+        orderId: orderId,
+        newStatus: newStatus,
+        changedBy: forwarder._id,
+        changedByType: "forwarder",
+        notes: `Status updated via dashboard by ${forwarder.businessName}`,
+        scanData: {
+          barcodeValue: orderId,
+          location: "Forwarder Dashboard",
+          deviceInfo: `${navigator.userAgent} - ${new Date().toISOString()}`,
+        }
       });
       
       // Refresh to show updated status
       window.location.reload();
     } catch (error) {
       console.error("Error updating status:", error);
-      alert("Failed to update order status");
+      alert(`Failed to update order status: ${error.message}`);
     }
   };
 

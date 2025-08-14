@@ -13,32 +13,28 @@ export async function loader(args: any) {
   }
 
   try {
-    // Get staff profile
-    const staff = await fetchQuery(api.staff.getStaffByUserId, { userId });
+    // Get forwarder profile
+    const forwarder = await fetchQuery(api.forwarders.getForwarderByUserId, { userId });
     
-    if (!staff) {
-      throw new Response("Staff profile not found", { status: 404 });
-    }
-
-    if (!staff.isActive) {
-      throw new Response("Staff account is inactive", { status: 403 });
+    if (!forwarder) {
+      throw new Response("Forwarder profile not found", { status: 404 });
     }
 
     return { 
-      staff,
+      forwarder,
       userId
     };
   } catch (error) {
-    console.error("Error loading staff data:", error);
+    console.error("Error loading forwarder data:", error);
     throw new Response("Internal Server Error", { status: 500 });
   }
 }
 
-export default function StaffScanner({ loaderData }: any) {
-  const { staff } = loaderData;
+export default function ForwarderScanner({ loaderData }: any) {
+  const { forwarder } = loaderData;
   const [isScanning, setIsScanning] = useState(false);
   const [scanResult, setScanResult] = useState<string | null>(null);
-  const [scanLocation, setScanLocation] = useState("Gate A");
+  const [scanLocation, setScanLocation] = useState("Admin Office");
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
   const [showStatusModal, setShowStatusModal] = useState(false);
@@ -46,85 +42,29 @@ export default function StaffScanner({ loaderData }: any) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Get today's orders for this staff member
-  const todaysOrders = useQuery(api.staff.getOrdersForStaff, { 
-    staffId: staff._id,
-    limit: 100 
-  });
-
-  // Check for tracking number or QR data in URL parameters
+  // Check for tracking number in URL parameters
   useEffect(() => {
-    // Wait for orders to load before processing URL
-    if (!todaysOrders) return;
-    
     const urlParams = new URLSearchParams(window.location.search);
     const trackingParam = urlParams.get('tracking');
-    const qrParam = urlParams.get('qr');
-    
-    console.log('URL PARAMS DEBUG:', { trackingParam, qrParam, ordersCount: todaysOrders.length });
-    
-    if (qrParam) {
-      console.log('Processing QR param:', qrParam);
-      // Handle QR data from generated QR codes
-      handleScanResult(qrParam);
-    } else if (trackingParam) {
-      console.log('Processing tracking param:', trackingParam);
-      // Handle legacy tracking parameter
+    if (trackingParam) {
       handleScanResult(trackingParam);
     }
-  }, [todaysOrders]);
+  }, []);
+
+  // Get all orders for this forwarder
+  const allOrders = useQuery(api.orders.getOrdersForForwarder, { 
+    forwarderId: forwarder._id,
+    limit: 200
+  });
+
+  // Mutations - forwarders can update any order status (admin privilege)
+  const updateOrderStatusAdmin = useMutation(api.orders.updateOrderStatus);
+  const logScan = useMutation(api.orderStatusHistory.logForwarderScan);
   
-  console.log("SCANNER DEBUG: todaysOrders =", todaysOrders);
-  console.log("SCANNER DEBUG: staff._id =", staff._id);
-
-  // Debug query to check if order exists in the system
-  const debugOrder = useQuery(
-    api.staff.findOrderByTrackingNumber,
-    scanResult && scanResult.includes('|') ? {
-      trackingNumber: scanResult.split('|')[1],
-      orderId: scanResult.split('|')[0],
-      forwarderId: staff.forwarderId
-    } : "skip"
-  );
-
-  // Check if order exists ANYWHERE in the system
-  const globalOrder = useQuery(
-    api.staff.findOrderAnywhere,
-    scanResult && scanResult.includes('|') ? {
-      trackingNumber: scanResult.split('|')[1],
-      orderId: scanResult.split('|')[0]
-    } : "skip"
-  );
-
-  // Debug staff warehouse assignments
-  const warehouseDebug = useQuery(
-    api.staff.debugStaffWarehouseAssignments,
-    { staffId: staff._id }
-  );
-
-  // Direct order lookup
-  const directLookup = useQuery(
-    api.staff.directOrderLookup,
-    scanResult && scanResult.includes('|') ? {
-      orderId: scanResult.split('|')[0],
-      trackingNumber: scanResult.split('|')[1]
-    } : "skip"
-  );
-
-  // Mutations
-  const updateOrderStatus = useMutation(api.staff.updateOrderStatus);
-  const logScan = useMutation(api.orderStatusHistory.logStaffScan);
-  
-  // Get valid next statuses for current order
-  const validNextStatuses = useQuery(
-    api.staff.getValidNextStatuses,
-    currentOrder ? { orderId: currentOrder._id, staffId: staff._id } : "skip"
-  );
-
   // Handle successful barcode scan
   const handleScanResult = async (scannedValue: string) => {
     setScanResult(scannedValue);
-    setIsScanning(false); // Stop scanning after successful scan
+    setIsScanning(false);
     
     // Parse QR code from print label format: "orderId|trackingNumber|courier"
     let trackingNumber = scannedValue;
@@ -136,11 +76,11 @@ export default function StaffScanner({ loaderData }: any) {
       trackingNumber = parts[1] || scannedValue;
     }
     
-    // Find order by tracking number or order ID (case insensitive, trimmed)
-    const order = todaysOrders?.find(o => 
-      o.trackingNumber?.trim().toLowerCase() === trackingNumber?.trim().toLowerCase() || 
+    // Find order by tracking number or order ID
+    const order = allOrders?.find(o => 
+      o.trackingNumber === trackingNumber || 
       o._id === orderId ||
-      o.trackingNumber?.trim().toLowerCase() === scannedValue?.trim().toLowerCase() || 
+      o.trackingNumber === scannedValue || 
       o._id === scannedValue
     );
 
@@ -148,80 +88,35 @@ export default function StaffScanner({ loaderData }: any) {
       setCurrentOrder(order);
       setShowStatusModal(true);
     } else {
-      // Debug info
-      console.log("🔍 Scan Debug Info:");
-      console.log("- Scanned value:", scannedValue);
-      console.log("- Parsed tracking number:", trackingNumber);
-      console.log("- Parsed order ID:", orderId);
-      console.log("- Staff assigned warehouses:", staff.warehouses?.map(w => w.name).join(', '));
-      console.log("- Available orders count:", todaysOrders?.length);
-      console.log("- Available tracking numbers:", todaysOrders?.map(o => o.trackingNumber).join(', '));
-      console.log("- Debug order search:", debugOrder);
-      
       // Log scan even if order not found
       try {
         const deviceInfo = `${navigator.userAgent} - ${new Date().toISOString()}`;
         await logScan({
-          staffId: staff._id,
-          orderId: orderId || scannedValue,
+          forwarderId: forwarder._id,
+          orderId: scannedValue,
           scanData: {
             barcodeValue: scannedValue,
             location: scanLocation,
             deviceInfo
           },
-          notes: `Package scanned - order not found in assigned warehouses: ${staff.warehouses?.map(w => w.name).join(', ')}`
+          notes: "Package scanned by forwarder - order not found"
         });
       } catch (error) {
         console.error("Error logging scan:", error);
       }
       
-      // Show debug info in alert for mobile  
-      const debugInfo = [
-        `📦 Scanned: ${scannedValue}`,
-        `🏷️ Tracking: ${trackingNumber}`,
-        `👤 Staff: ${staff.name}`,
-        `🏢 Your warehouses: ${staff.warehouses?.map(w => w.name).join(', ')}`,
-        `🏭 Forwarder ID: ${staff.forwarderId.slice(-8)}`,
-        `📊 Your orders: ${todaysOrders?.length || 0} (should show 29)`,
-        `📋 Orders available for search: ${todaysOrders?.map(o => o.trackingNumber).slice(0,5).join(', ')}...`,
-        debugOrder?.found 
-          ? `✅ Order exists in: ${debugOrder.warehouseName}` 
-          : `❌ Order not found (searched ${debugOrder?.totalOrdersInForwarder || 0} orders)`,
-        globalOrder?.found 
-          ? `🌍 FOUND ELSEWHERE: Forwarder ${globalOrder.order.forwarderId.slice(-8)}` 
-          : `🌍 Not found anywhere (${globalOrder?.totalOrders || 0} total orders)`,
-        `🔧 DIRECT ORDER LOOKUP:`,
-        directLookup ? `  - Order found: ${directLookup.found}` : '  - Direct lookup loading...',
-        directLookup?.found ? `  - Order forwarder: ${directLookup.order.forwarderId}` : '',
-        directLookup?.found ? `  - Order warehouse: ${directLookup.order.warehouseId}` : '',
-        directLookup?.found ? `  - Warehouse name: ${directLookup.warehouse?.name}` : '',
-        directLookup && !directLookup.found ? `  - Total orders in system: ${directLookup.totalOrders}` : '',
-        `🔧 STAFF INFO:`,
-        `  - Staff forwarder ID: ${staff.forwarderId}`,
-        `  - Staff assigned warehouses: ${JSON.stringify(staff.assignedWarehouses)}`,
-        `  - Staff warehouses from UI: ${JSON.stringify(staff.warehouses?.map(w => w._id))}`,
-        directLookup?.found ? `  - FORWARDER MATCH: ${staff.forwarderId === directLookup.order.forwarderId ? '✅' : '❌'}` : '',
-        directLookup?.found ? `  - WAREHOUSE MATCH: ${staff.assignedWarehouses?.includes(directLookup.order.warehouseId) ? '✅' : '❌'}` : ''
-      ].join('\n\n');
-      
-      alert(`DEBUG INFO:\n\n${debugInfo}\n\n${debugOrder?.found ? 'Order exists but not in your warehouse!' : 'Order not found in system!'}`);
-      
-      // Keep the original alert too
-      setTimeout(() => {
-        alert(`Package ${trackingNumber || scannedValue} not found in your assigned warehouses`);
-      }, 100);
+      alert(`Package ${scannedValue} scanned but not found in your orders`);
     }
   };
 
   // Handle scan errors
   const handleScanError = (error: string) => {
     console.error('Barcode scan error:', error);
-    // Don't show alert for every error, just log it
   };
 
   // Simulate barcode scanning for testing
   const simulateScan = () => {
-    const mockTrackingNumbers = todaysOrders?.map(o => o.trackingNumber) || [];
+    const mockTrackingNumbers = allOrders?.slice(0, 10).map(o => o.trackingNumber) || [];
     if (mockTrackingNumbers.length > 0) {
       const randomTracking = mockTrackingNumbers[Math.floor(Math.random() * mockTrackingNumbers.length)];
       handleScanResult(randomTracking);
@@ -236,11 +131,12 @@ export default function StaffScanner({ loaderData }: any) {
     try {
       const deviceInfo = `${navigator.userAgent} - ${new Date().toISOString()}`;
       
-      await updateOrderStatus({
+      await updateOrderStatusAdmin({
         orderId: currentOrder._id,
         newStatus: selectedStatus,
-        staffId: staff._id,
-        notes: notes || undefined,
+        notes: notes || `Updated by forwarder ${forwarder.businessName}`,
+        changedBy: forwarder._id,
+        changedByType: "forwarder",
         scanData: {
           barcodeValue: scanResult || currentOrder.trackingNumber,
           location: scanLocation,
@@ -272,9 +168,11 @@ export default function StaffScanner({ loaderData }: any) {
     }
   };
 
-  // Remove the old getNextStatusOptions function - now using validNextStatuses from query
+  const getAllStatuses = () => {
+    return ["incoming", "arrived_at_warehouse", "packed", "awaiting_pickup", "in_transit", "delivered"];
+  };
 
-  if (!todaysOrders) {
+  if (!allOrders) {
     return (
       <div className="min-h-screen bg-background p-4">
         <div className="animate-pulse">
@@ -293,25 +191,20 @@ export default function StaffScanner({ loaderData }: any) {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <div className="bg-card border-b border-border p-4">
-        <div className="max-w-md mx-auto">
-          <h1 className="text-2xl font-semibold text-foreground text-center">Scanner</h1>
+        <div className="max-w-4xl mx-auto">
+          <h1 className="text-2xl font-semibold text-foreground text-center">Forwarder Scanner</h1>
           <p className="text-sm text-muted-foreground text-center mt-1">
-            {staff.name} • {staff.warehouses.map(w => w.name).join(', ')}
+            {forwarder.businessName} • Admin Access
           </p>
           <div className="flex justify-center mt-2">
-            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-              staff.role === 'manager' ? 'bg-purple-100 text-purple-800' :
-              staff.role === 'supervisor' ? 'bg-blue-100 text-blue-800' :
-              'bg-green-100 text-green-800'
-            }`}>
-              {staff.role.replace('_', ' ')}
-              {staff.role === 'warehouse_worker' && ' (Forward-only updates)'}
+            <span className="px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+              🔑 Admin - Can update any order status
             </span>
           </div>
         </div>
       </div>
 
-      <div className="max-w-md mx-auto p-4 space-y-6">
+      <div className="max-w-4xl mx-auto p-4 space-y-6">
         {/* Scanner Section */}
         <div className="bg-card border border-border rounded-xl p-6">
           <div className="text-center space-y-4">
@@ -322,7 +215,7 @@ export default function StaffScanner({ loaderData }: any) {
             </div>
             <h2 className="text-lg font-medium text-foreground">Scan Package</h2>
             <p className="text-sm text-muted-foreground">
-              Point your camera at the barcode or QR code on the package
+              Scan QR codes or barcodes to quickly update order status
             </p>
             
             {/* Location Selection */}
@@ -332,13 +225,12 @@ export default function StaffScanner({ loaderData }: any) {
                 onChange={(e) => setScanLocation(e.target.value)}
                 className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
               >
-                <option value="Gate A">Gate A</option>
-                <option value="Gate B">Gate B</option>
-                <option value="Station 1">Packing Station 1</option>
-                <option value="Station 2">Packing Station 2</option>
-                <option value="Station 3">Packing Station 3</option>
-                <option value="Loading Bay">Loading Bay</option>
+                <option value="Admin Office">Admin Office</option>
+                <option value="Warehouse Floor">Warehouse Floor</option>
+                <option value="Loading Dock">Loading Dock</option>
+                <option value="Inspection Area">Inspection Area</option>
                 <option value="Storage Area">Storage Area</option>
+                <option value="Shipping Department">Shipping Department</option>
               </select>
               
               {/* Scanner Controls */}
@@ -386,22 +278,22 @@ export default function StaffScanner({ loaderData }: any) {
           </div>
         </div>
 
-        {/* Today's Orders Summary */}
+        {/* Recent Orders Summary */}
         <div className="bg-card border border-border rounded-xl p-6">
-          <h3 className="font-medium text-foreground mb-4">Today's Orders ({todaysOrders.length})</h3>
+          <h3 className="font-medium text-foreground mb-4">Recent Orders ({allOrders.length} total)</h3>
           
-          {todaysOrders.length === 0 ? (
+          {allOrders.length === 0 ? (
             <div className="text-center py-8">
               <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center mx-auto mb-3">
                 <svg className="w-6 h-6 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
                 </svg>
               </div>
-              <p className="text-muted-foreground text-sm">No orders assigned to your warehouses today</p>
+              <p className="text-muted-foreground text-sm">No orders found in your forwarder account</p>
             </div>
           ) : (
             <div className="space-y-3">
-              {todaysOrders.slice(0, 5).map((order) => (
+              {allOrders.slice(0, 8).map((order) => (
                 <div key={order._id} className="flex items-center justify-between p-3 bg-background border border-border rounded-lg">
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-foreground text-sm truncate">{order.trackingNumber}</p>
@@ -412,9 +304,9 @@ export default function StaffScanner({ loaderData }: any) {
                   </span>
                 </div>
               ))}
-              {todaysOrders.length > 5 && (
+              {allOrders.length > 8 && (
                 <p className="text-xs text-muted-foreground text-center">
-                  +{todaysOrders.length - 5} more orders
+                  +{allOrders.length - 8} more orders
                 </p>
               )}
             </div>
@@ -425,18 +317,18 @@ export default function StaffScanner({ loaderData }: any) {
         <div className="bg-card border border-border rounded-xl p-6">
           <h3 className="font-medium text-foreground mb-4">Quick Actions</h3>
           <div className="grid grid-cols-2 gap-3">
-            <button className="p-3 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-100 transition-colors">
-              View All Orders
-            </button>
-            <button className="p-3 bg-green-50 text-green-700 rounded-lg text-sm font-medium hover:bg-green-100 transition-colors">
-              Print Labels
-            </button>
-            <button className="p-3 bg-purple-50 text-purple-700 rounded-lg text-sm font-medium hover:bg-purple-100 transition-colors">
-              Scan History
-            </button>
-            <button className="p-3 bg-orange-50 text-orange-700 rounded-lg text-sm font-medium hover:bg-orange-100 transition-colors">
-              Report Issue
-            </button>
+            <a href="/forwarder/orders" className="p-3 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-100 transition-colors text-center">
+              📦 View All Orders
+            </a>
+            <a href="/forwarder/qr-generator" className="p-3 bg-green-50 text-green-700 rounded-lg text-sm font-medium hover:bg-green-100 transition-colors text-center">
+              🏷️ Generate QR Codes
+            </a>
+            <a href="/forwarder/staff" className="p-3 bg-purple-50 text-purple-700 rounded-lg text-sm font-medium hover:bg-purple-100 transition-colors text-center">
+              👥 Manage Staff
+            </a>
+            <a href="/forwarder/analytics" className="p-3 bg-orange-50 text-orange-700 rounded-lg text-sm font-medium hover:bg-orange-100 transition-colors text-center">
+              📊 View Analytics
+            </a>
           </div>
         </div>
       </div>
@@ -468,22 +360,15 @@ export default function StaffScanner({ loaderData }: any) {
                   className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                 >
                   <option value="">Select new status...</option>
-                  {(validNextStatuses || []).map((status) => (
+                  {getAllStatuses().map((status) => (
                     <option key={status} value={status}>
                       {status.replace('_', ' ')}
                     </option>
                   ))}
                 </select>
-                {staff.role === 'warehouse_worker' && (
-                  <p className="text-xs text-muted-foreground mt-2">
-                    ⚠️ Workers can only move orders forward. Contact supervisor for status reversals.
-                  </p>
-                )}
-                {(staff.role === 'supervisor' || staff.role === 'manager') && (
-                  <p className="text-xs text-green-600 mt-2">
-                    ✅ You can update to any status including backwards transitions.
-                  </p>
-                )}
+                <p className="text-xs text-green-600 mt-2">
+                  ✅ Admin access - you can update to any status including backwards transitions
+                </p>
               </div>
 
               <div>
