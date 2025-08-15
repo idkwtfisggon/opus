@@ -4,6 +4,7 @@ import type { Route } from "./+types/orders";
 import { api } from "../../../convex/_generated/api";
 import { useMutation, useQuery } from "convex/react";
 import { useState } from "react";
+import ShippingRatesModal from "../../components/courier/ShippingRatesModal";
 
 export async function loader(args: Route.LoaderArgs) {
   const { userId } = await getAuth(args);
@@ -82,6 +83,10 @@ export default function ManageOrders({ loaderData }: Route.ComponentProps) {
   const [splitOrderId, setSplitOrderId] = useState<string | null>(null);
   const [splitItems, setSplitItems] = useState([{ description: "", quantity: 1, weight: 0, value: 0 }]);
   const [splitTargetWarehouse, setSplitTargetWarehouse] = useState("");
+  
+  // Shipping modal states
+  const [shippingModalOpen, setShippingModalOpen] = useState(false);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
 
   const handleCreateTestOrder = async () => {
     console.log("Debug - forwarder:", forwarder);
@@ -166,6 +171,13 @@ export default function ManageOrders({ loaderData }: Route.ComponentProps) {
       console.error("Error updating status:", error);
       alert(`Failed to update order status: ${error.message}`);
     }
+  };
+
+  const handleLabelCreated = (result: any) => {
+    console.log("Label created:", result);
+    alert(`Shipping label created! Tracking: ${result.trackingNumber}`);
+    // Refresh orders list
+    window.location.reload();
   };
 
   // Filter and sort orders
@@ -662,9 +674,15 @@ export default function ManageOrders({ loaderData }: Route.ComponentProps) {
                             Print Label
                           </a>
                         ) : order.status === 'arrived_at_warehouse' && !order.courier ? (
-                          <span className="text-sm text-red-600">
-                            ⚠️ No courier assigned
-                          </span>
+                          <button
+                            onClick={() => {
+                              setSelectedOrderId(order._id);
+                              setShippingModalOpen(true);
+                            }}
+                            className="bg-primary text-primary-foreground px-3 py-1 rounded-md text-sm font-medium hover:bg-primary/90 transition-colors"
+                          >
+                            🚚 Create Label
+                          </button>
                         ) : order.status === 'incoming' ? (
                           <button 
                             className="bg-muted text-muted-foreground px-3 py-1 rounded-md text-sm font-medium cursor-not-allowed" 
@@ -874,6 +892,19 @@ export default function ManageOrders({ loaderData }: Route.ComponentProps) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Shipping Rates Modal */}
+      {shippingModalOpen && selectedOrderId && forwarder && (
+        <ShippingRatesModal
+          orderId={selectedOrderId}
+          forwarderId={forwarder._id}
+          onClose={() => {
+            setShippingModalOpen(false);
+            setSelectedOrderId(null);
+          }}
+          onLabelCreated={handleLabelCreated}
+        />
       )}
     </div>
   );

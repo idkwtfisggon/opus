@@ -42,6 +42,7 @@ export default [
     route("forwarder/qr-generator", "routes/forwarder/qr-generator.tsx"),
     route("forwarder/order-audit", "routes/forwarder/order-audit.tsx"),
     route("forwarder/service-areas", "routes/forwarder/service-areas.tsx"),
+    route("forwarder/courier-integrations", "routes/forwarder/courier-integrations.tsx"),
     route("forwarder/analytics", "routes/forwarder/analytics.tsx"),
     route("forwarder/settings", "routes/forwarder/settings.tsx"),
     route("forwarder/account", "routes/forwarder/account.tsx"),

@@ -516,6 +516,147 @@ export default defineSchema({
     .index("by_forwarder", ["forwarderId"])
     .index("by_status", ["status"]),
 
+  // Courier API integrations
+  courierIntegrations: defineTable({
+    forwarderId: v.string(),
+    courierName: v.string(), // "DHL", "UPS", "FedEx", "SF Express"
+    mode: v.union(v.literal("api"), v.literal("manual")), // API or manual mode
+    
+    // API credentials (encrypted)
+    apiCredentials: v.optional(v.object({
+      accountNumber: v.optional(v.string()),
+      apiKey: v.optional(v.string()),
+      apiSecret: v.optional(v.string()),
+      environment: v.union(v.literal("sandbox"), v.literal("production")),
+      // Carrier-specific fields
+      siteId: v.optional(v.string()), // DHL
+      password: v.optional(v.string()), // UPS
+      meterNumber: v.optional(v.string()), // FedEx
+    })),
+    
+    // Configuration
+    settings: v.object({
+      defaultService: v.optional(v.string()), // "DHL Express Worldwide"
+      enableEtd: v.optional(v.boolean()), // Electronic Trade Documents
+      autoTracking: v.optional(v.boolean()), // Auto-poll for tracking updates
+      trackingFrequency: v.optional(v.number()), // Hours between tracking checks
+    }),
+    
+    // Status
+    status: v.union(
+      v.literal("not_configured"),
+      v.literal("testing"), 
+      v.literal("ready"),
+      v.literal("error")
+    ),
+    lastTestResult: v.optional(v.object({
+      timestamp: v.number(),
+      success: v.boolean(),
+      error: v.optional(v.string()),
+      rateTest: v.optional(v.boolean()),
+      labelTest: v.optional(v.boolean()),
+    })),
+    
+    isActive: v.boolean(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_forwarder", ["forwarderId"])
+    .index("by_courier", ["courierName"])
+    .index("by_status", ["status"]),
+
+  // Shipping labels and tracking
+  shippingLabels: defineTable({
+    orderId: v.string(),
+    forwarderId: v.string(),
+    courierIntegrationId: v.string(),
+    
+    // Label details
+    courierName: v.string(),
+    serviceName: v.string(),
+    trackingNumber: v.string(),
+    labelPdfUrl: v.optional(v.string()), // PDF storage URL
+    
+    // Shipping details
+    fromAddress: v.object({
+      name: v.string(),
+      company: v.optional(v.string()),
+      address: v.string(),
+      city: v.string(),
+      state: v.optional(v.string()),
+      postalCode: v.string(),
+      country: v.string(),
+      phone: v.optional(v.string()),
+    }),
+    toAddress: v.object({
+      name: v.string(),
+      company: v.optional(v.string()),
+      address: v.string(),
+      city: v.string(),
+      state: v.optional(v.string()),
+      postalCode: v.string(),
+      country: v.string(),
+      phone: v.optional(v.string()),
+    }),
+    
+    // Package details
+    weight: v.number(),
+    dimensions: v.optional(v.object({
+      length: v.number(),
+      width: v.number(),
+      height: v.number(),
+      unit: v.string(), // "cm" or "in"
+    })),
+    declaredValue: v.optional(v.number()),
+    currency: v.optional(v.string()),
+    
+    // Costs
+    shippingCost: v.optional(v.number()),
+    taxes: v.optional(v.number()),
+    totalCost: v.optional(v.number()),
+    
+    // Status
+    status: v.union(
+      v.literal("created"),
+      v.literal("printed"),
+      v.literal("dispatched"),
+      v.literal("in_transit"),
+      v.literal("delivered"),
+      v.literal("exception"),
+      v.literal("cancelled")
+    ),
+    
+    // API response data
+    carrierResponse: v.optional(v.any()), // Raw API response
+    etdSubmitted: v.optional(v.boolean()),
+    
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_order", ["orderId"])
+    .index("by_forwarder", ["forwarderId"])
+    .index("by_tracking", ["trackingNumber"])
+    .index("by_courier", ["courierName"])
+    .index("by_status", ["status"]),
+
+  // Tracking events
+  trackingEvents: defineTable({
+    shippingLabelId: v.string(),
+    trackingNumber: v.string(),
+    
+    // Event details
+    eventType: v.string(), // "picked_up", "in_transit", "delivered", etc.
+    description: v.string(),
+    location: v.optional(v.string()),
+    timestamp: v.number(),
+    
+    // Carrier data
+    carrierEventCode: v.optional(v.string()),
+    carrierData: v.optional(v.any()),
+    
+    createdAt: v.number(),
+  }).index("by_label", ["shippingLabelId"])
+    .index("by_tracking", ["trackingNumber"])
+    .index("by_timestamp", ["timestamp"]),
+
   // Warehouse service areas - defines which geographic areas each warehouse can serve
   warehouseServiceAreas: defineTable({
     warehouseId: v.string(), // Links to warehouses table

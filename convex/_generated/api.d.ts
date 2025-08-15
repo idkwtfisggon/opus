@@ -14,6 +14,7 @@ import type {
   FunctionReference,
 } from "convex/server";
 import type * as analytics from "../analytics.js";
+import type * as courierIntegrations from "../courierIntegrations.js";
 import type * as customerDashboard from "../customerDashboard.js";
 import type * as customerOrders from "../customerOrders.js";
 import type * as fixUsers from "../fixUsers.js";
@@ -44,6 +45,7 @@ import type * as warehouses from "../warehouses.js";
  */
 declare const fullApi: ApiFromModules<{
   analytics: typeof analytics;
+  courierIntegrations: typeof courierIntegrations;
   customerDashboard: typeof customerDashboard;
   customerOrders: typeof customerOrders;
   fixUsers: typeof fixUsers;

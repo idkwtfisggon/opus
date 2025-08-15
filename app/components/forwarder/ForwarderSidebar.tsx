@@ -36,6 +36,13 @@ const navigation = [
     description: "Performance insights"
   },
   { 
+    id: "couriers", 
+    name: "Couriers", 
+    href: "/forwarder/courier-integrations", 
+    icon: Truck,
+    description: "API integrations"
+  },
+  { 
     id: "settings", 
     name: "Settings", 
     href: "/forwarder/settings", 

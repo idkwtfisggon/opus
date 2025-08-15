@@ -125,6 +125,14 @@ export default function ForwarderLayout() {
             </svg>
             Service Areas
           </a>
+
+          <a href="/forwarder/courier-integrations" 
+             className="flex items-center px-3 py-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-lg transition-colors">
+            <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l4-4 4 4m0 6l-4 4-4-4M8 4V1m8 0v3M4 8h3m10 0h3" />
+            </svg>
+            Courier Integrations
+          </a>
           
           <a href="/forwarder/analytics" 
              className="flex items-center px-3 py-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-lg transition-colors">
