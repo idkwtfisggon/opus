@@ -23,6 +23,7 @@
       "routes/success": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/subscription-required": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/print-label": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/seed-data": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/dashboard/index": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/dashboard/chat": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/dashboard/settings": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
@@ -34,8 +35,11 @@
       "routes/forwarder/index": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/forwarder/orders": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/forwarder/staff": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/forwarder/scanner": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/forwarder/qr-generator": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/forwarder/order-audit": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/forwarder/service-areas": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/forwarder/courier-integrations": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/forwarder/analytics": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/forwarder/settings": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/forwarder/account": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
@@ -169,6 +173,15 @@
           "runtime": "nodejs"
         }
       },
+      "routes/seed-data": {
+        "id": "routes/seed-data",
+        "parentId": "root",
+        "file": "app/routes/seed-data.tsx",
+        "path": "seed-data",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
       "routes/dashboard/layout": {
         "id": "routes/dashboard/layout",
         "parentId": "root",
@@ -286,6 +299,24 @@
           "runtime": "nodejs"
         }
       },
+      "routes/forwarder/scanner": {
+        "id": "routes/forwarder/scanner",
+        "parentId": "routes/forwarder/layout",
+        "file": "app/routes/forwarder/scanner.tsx",
+        "path": "forwarder/scanner",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/forwarder/qr-generator": {
+        "id": "routes/forwarder/qr-generator",
+        "parentId": "routes/forwarder/layout",
+        "file": "app/routes/forwarder/qr-generator.tsx",
+        "path": "forwarder/qr-generator",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
       "routes/forwarder/order-audit": {
         "id": "routes/forwarder/order-audit",
         "parentId": "routes/forwarder/layout",
@@ -300,6 +331,15 @@
         "parentId": "routes/forwarder/layout",
         "file": "app/routes/forwarder/service-areas.tsx",
         "path": "forwarder/service-areas",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/forwarder/courier-integrations": {
+        "id": "routes/forwarder/courier-integrations",
+        "parentId": "routes/forwarder/layout",
+        "file": "app/routes/forwarder/courier-integrations.tsx",
+        "path": "forwarder/courier-integrations",
         "config": {
           "runtime": "nodejs"
         }
@@ -479,6 +519,12 @@
         "file": "routes/print-label.tsx",
         "path": "print-label"
       },
+      "routes/seed-data": {
+        "id": "routes/seed-data",
+        "parentId": "root",
+        "file": "routes/seed-data.tsx",
+        "path": "seed-data"
+      },
       "routes/dashboard/layout": {
         "id": "routes/dashboard/layout",
         "parentId": "root",
@@ -560,6 +606,18 @@
         "file": "routes/forwarder/staff.tsx",
         "path": "forwarder/staff"
       },
+      "routes/forwarder/scanner": {
+        "id": "routes/forwarder/scanner",
+        "parentId": "routes/forwarder/layout",
+        "file": "routes/forwarder/scanner.tsx",
+        "path": "forwarder/scanner"
+      },
+      "routes/forwarder/qr-generator": {
+        "id": "routes/forwarder/qr-generator",
+        "parentId": "routes/forwarder/layout",
+        "file": "routes/forwarder/qr-generator.tsx",
+        "path": "forwarder/qr-generator"
+      },
       "routes/forwarder/order-audit": {
         "id": "routes/forwarder/order-audit",
         "parentId": "routes/forwarder/layout",
@@ -571,6 +629,12 @@
         "parentId": "routes/forwarder/layout",
         "file": "routes/forwarder/service-areas.tsx",
         "path": "forwarder/service-areas"
+      },
+      "routes/forwarder/courier-integrations": {
+        "id": "routes/forwarder/courier-integrations",
+        "parentId": "routes/forwarder/layout",
+        "file": "routes/forwarder/courier-integrations.tsx",
+        "path": "forwarder/courier-integrations"
       },
       "routes/forwarder/analytics": {
         "id": "routes/forwarder/analytics",

@@ -1,6 +1,17 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 
+// Get current staff member (mock for now - in real app would use auth)
+export const getCurrentStaff = query({
+  args: {},
+  handler: async (ctx) => {
+    // Mock: Return first staff member for testing
+    // In real implementation, you'd use ctx.auth to get current user
+    const staff = await ctx.db.query("staff").first();
+    return staff;
+  },
+});
+
 // Get all staff for a forwarder
 export const getForwarderStaff = query({
   args: { forwarderId: v.string() },

@@ -56,15 +56,179 @@ export default function PrintLabelPage() {
         position: "relative",
       }}
     >
-      {/* Header */}
-      <div style={{ 
-        display: "flex", 
-        justifyContent: "space-between",
-        alignItems: "flex-start",
-        marginBottom: "8px",
-        borderBottom: "2px solid #000",
-        paddingBottom: "4px"
+      {/* Top Ruler - Inches */}
+      <div style={{
+        position: "absolute",
+        top: "0",
+        left: "0",
+        width: "4in",
+        height: "6px",
+        backgroundColor: "white",
+        borderBottom: "1px solid #000",
+        display: "flex",
+        zIndex: 10,
       }}>
+        {[0, 1, 2, 3, 4].map(inch => (
+          <div key={inch} style={{
+            position: "absolute",
+            left: `${inch}in`,
+            width: "1px",
+            height: "6px",
+            backgroundColor: "#000",
+            display: "flex",
+            alignItems: "flex-end",
+            justifyContent: "center",
+          }}>
+            <span style={{
+              fontSize: "4px",
+              color: "#000",
+              transform: "translateY(8px)",
+              fontWeight: "bold",
+            }}>{inch}"</span>
+          </div>
+        ))}
+        {/* Half-inch marks */}
+        {[0.5, 1.5, 2.5, 3.5].map(inch => (
+          <div key={inch} style={{
+            position: "absolute",
+            left: `${inch}in`,
+            width: "1px",
+            height: "3px",
+            backgroundColor: "#000",
+          }} />
+        ))}
+      </div>
+
+      {/* Left Ruler - Centimeters */}
+      <div style={{
+        position: "absolute",
+        top: "0",
+        left: "0",
+        width: "6px",
+        height: "3in",
+        backgroundColor: "white",
+        borderRight: "1px solid #000",
+        zIndex: 10,
+      }}>
+        {[0, 1, 2, 3, 4, 5, 6, 7].map(cm => (
+          <div key={cm} style={{
+            position: "absolute",
+            top: `${cm * 0.393701}in`, // Convert cm to inches
+            left: "0",
+            width: "6px",
+            height: "1px",
+            backgroundColor: "#000",
+            display: "flex",
+            alignItems: "center",
+          }}>
+            {cm % 2 === 0 && (
+              <span style={{
+                fontSize: "4px",
+                color: "#000",
+                transform: "translateX(8px)",
+                fontWeight: "bold",
+              }}>{cm}</span>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Right Ruler - Inches (Height) */}
+      <div style={{
+        position: "absolute",
+        top: "0",
+        right: "0",
+        width: "6px",
+        height: "3in",
+        backgroundColor: "white",
+        borderLeft: "1px solid #000",
+        zIndex: 10,
+      }}>
+        {[0, 1, 2, 3].map(inch => (
+          <div key={inch} style={{
+            position: "absolute",
+            top: `${inch}in`,
+            right: "0",
+            width: "6px",
+            height: "1px",
+            backgroundColor: "#000",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "flex-start",
+          }}>
+            <span style={{
+              fontSize: "4px",
+              color: "#000",
+              transform: "translateX(-8px)",
+              fontWeight: "bold",
+            }}>{inch}"</span>
+          </div>
+        ))}
+        {/* Half-inch marks */}
+        {[0.5, 1.5, 2.5].map(inch => (
+          <div key={inch} style={{
+            position: "absolute",
+            top: `${inch}in`,
+            right: "0",
+            width: "3px",
+            height: "1px",
+            backgroundColor: "#000",
+          }} />
+        ))}
+      </div>
+
+      {/* Bottom Ruler - Centimeters */}
+      <div style={{
+        position: "absolute",
+        bottom: "0",
+        left: "0",
+        width: "4in",
+        height: "6px",
+        backgroundColor: "white",
+        borderTop: "1px solid #000",
+        zIndex: 10,
+      }}>
+        {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(cm => (
+          <div key={cm} style={{
+            position: "absolute",
+            left: `${cm * 0.393701}in`, // Convert cm to inches
+            bottom: "0",
+            width: "1px",
+            height: "6px",
+            backgroundColor: "#000",
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "center",
+          }}>
+            {cm % 2 === 0 && (
+              <span style={{
+                fontSize: "4px",
+                color: "#000",
+                transform: "translateY(-8px)",
+                fontWeight: "bold",
+              }}>{cm}</span>
+            )}
+          </div>
+        ))}
+      </div>
+      {/* Main Content Area - Adjusted for rulers */}
+      <div style={{
+        margin: "6px",
+        display: "flex",
+        flexDirection: "column",
+        height: "calc(100% - 12px)",
+        position: "relative",
+        zIndex: 1,
+      }}>
+        {/* Header */}
+        <div style={{ 
+          display: "flex", 
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          marginBottom: "8px",
+          borderBottom: "2px solid #000",
+          paddingBottom: "4px"
+        }}>
         <div>
           <h1 style={{ 
             margin: 0, 
@@ -188,6 +352,7 @@ export default function PrintLabelPage() {
             {trackingNumber}
           </div>
         )}
+      </div>
       </div>
     </div>
   );
