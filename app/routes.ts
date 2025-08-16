@@ -30,6 +30,8 @@ export default [
     route("customer", "routes/customer/index.tsx"),
     route("customer/orders", "routes/customer/orders.tsx"),
     route("customer/create-order", "routes/customer/create-order.tsx"),
+    route("customer/mail", "routes/customer/mail/index.tsx"),
+    route("customer/email-settings", "routes/customer/email-settings.tsx"),
     route("customer/account", "routes/customer/account.tsx"),
     route("customer/settings", "routes/customer/settings.tsx"),
   ]),

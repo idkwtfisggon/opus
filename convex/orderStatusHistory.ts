@@ -115,7 +115,7 @@ export const updateOrderStatusWithTracking = mutation({
       throw new Error("Order not found");
     }
 
-    const previousStatus = order.status;
+    const previousStatus = (order as any).status;
 
     // Get staff and warehouse names for caching
     let staffName: string | undefined;
@@ -123,11 +123,11 @@ export const updateOrderStatusWithTracking = mutation({
 
     if (changedByType === "staff") {
       const staff = await ctx.db.get(changedBy as any);
-      staffName = staff?.name;
+      staffName = (staff as any)?.name;
     }
 
-    const warehouse = await ctx.db.get(order.warehouseId as any);
-    warehouseName = warehouse?.name;
+    const warehouse = await ctx.db.get((order as any).warehouseId as any);
+    warehouseName = (warehouse as any)?.name;
 
     // Update order status
     await ctx.db.patch(orderId as any, {
@@ -136,7 +136,7 @@ export const updateOrderStatusWithTracking = mutation({
       // Update specific timestamps based on status
       ...(newStatus === "arrived_at_warehouse" && { receivedAt: now }),
       ...(newStatus === "packed" && { packedAt: now }),
-      ...(newStatus === "shipped" || newStatus === "in_transit" && { shippedAt: now }),
+      ...((newStatus === "shipped" || newStatus === "in_transit") ? { shippedAt: now } : {}),
       ...(newStatus === "delivered" && { deliveredAt: now }),
     });
 
@@ -158,8 +158,8 @@ export const updateOrderStatusWithTracking = mutation({
     if (changedByType === "staff") {
       await ctx.db.insert("staffActivity", {
         staffId: changedBy,
-        forwarderId: order.forwarderId,
-        warehouseId: order.warehouseId,
+        forwarderId: (order as any).forwarderId,
+        warehouseId: (order as any).warehouseId,
         activityType: scanData ? "scan" : "status_update",
         orderId,
         details: {
@@ -201,15 +201,15 @@ export const logStaffScan = mutation({
     }
 
     // Verify staff has access to this warehouse
-    if (!staff.assignedWarehouses.includes(order.warehouseId)) {
+    if (!(staff as any).assignedWarehouses.includes((order as any).warehouseId)) {
       throw new Error("Staff member does not have access to this warehouse");
     }
 
     // Log the scan activity
     const activityId = await ctx.db.insert("staffActivity", {
       staffId,
-      forwarderId: order.forwarderId,
-      warehouseId: order.warehouseId,
+      forwarderId: (order as any).forwarderId,
+      warehouseId: (order as any).warehouseId,
       activityType: "scan",
       orderId,
       details: {
@@ -221,12 +221,12 @@ export const logStaffScan = mutation({
     // Optionally create a history entry for the scan (without status change)
     const historyId = await ctx.db.insert("orderStatusHistory", {
       orderId,
-      previousStatus: order.status,
-      newStatus: order.status, // Same status
+      previousStatus: (order as any).status,
+      newStatus: (order as any).status, // Same status
       changedBy: staffId,
       changedByType: "staff",
-      staffName: staff.name,
-      warehouseName: (await ctx.db.get(order.warehouseId as any))?.name,
+      staffName: (staff as any).name,
+      warehouseName: ((await ctx.db.get((order as any).warehouseId as any)) as any)?.name,
       notes: notes || "Package scanned",
       scanData,
       changedAt: now,
@@ -328,12 +328,12 @@ export const logForwarderScan = mutation({
     // Create a history entry for the scan
     const historyId = await ctx.db.insert("orderStatusHistory", {
       orderId,
-      previousStatus: order.status,
-      newStatus: order.status, // Same status
+      previousStatus: (order as any).status,
+      newStatus: (order as any).status, // Same status
       changedBy: forwarderId,
       changedByType: "forwarder",
-      staffName: forwarder.businessName,
-      warehouseName: (await ctx.db.get(order.warehouseId as any))?.name,
+      staffName: (forwarder as any).businessName,
+      warehouseName: ((await ctx.db.get((order as any).warehouseId as any)) as any)?.name,
       notes: notes || "Package scanned by admin",
       scanData,
       changedAt: now,

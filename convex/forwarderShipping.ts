@@ -114,8 +114,8 @@ export const createShippingRate = mutation({
     if (!forwarder) throw new Error("Forwarder not found");
 
     // Verify zone belongs to this forwarder
-    const zone = await ctx.db.get(args.zoneId);
-    if (!zone || zone.forwarderId !== forwarder._id) {
+    const zone = await ctx.db.get(args.zoneId as any);
+    if (!zone || (zone as any).forwarderId !== forwarder._id) {
       throw new Error("Zone not found or unauthorized");
     }
 
@@ -164,18 +164,18 @@ export const updateShippingRate = mutation({
 
     if (!forwarder) throw new Error("Forwarder not found");
 
-    const rate = await ctx.db.get(args.rateId);
-    if (!rate || rate.forwarderId !== forwarder._id) {
+    const rate = await ctx.db.get(args.rateId as any);
+    if (!rate || (rate as any).forwarderId !== forwarder._id) {
       throw new Error("Rate not found or unauthorized");
     }
 
     const { rateId, ...updateData } = args;
-    await ctx.db.patch(args.rateId, {
+    await ctx.db.patch(args.rateId as any, {
       ...updateData,
       updatedAt: Date.now(),
     });
 
-    return await ctx.db.get(args.rateId);
+    return await ctx.db.get(args.rateId as any);
   },
 });
 
@@ -193,11 +193,11 @@ export const deleteShippingRate = mutation({
 
     if (!forwarder) throw new Error("Forwarder not found");
 
-    const rate = await ctx.db.get(args.rateId);
-    if (!rate || rate.forwarderId !== forwarder._id) {
+    const rate = await ctx.db.get(args.rateId as any);
+    if (!rate || (rate as any).forwarderId !== forwarder._id) {
       throw new Error("Rate not found or unauthorized");
     }
 
-    await ctx.db.delete(args.rateId);
+    await ctx.db.delete(args.rateId as any);
   },
 });

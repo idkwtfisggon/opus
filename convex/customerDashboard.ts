@@ -319,3 +319,20 @@ export const addFavoriteForwarder = mutation({
     });
   },
 });
+
+// Get customer profile by userId
+export const getCustomerProfile = query({
+  args: { userId: v.string() },
+  handler: async (ctx, { userId }) => {
+    const customer = await ctx.db
+      .query("users")
+      .withIndex("by_token", (q) => q.eq("tokenIdentifier", userId))
+      .unique();
+
+    if (!customer || customer.role !== "customer") {
+      return null;
+    }
+
+    return customer;
+  },
+});

@@ -14,10 +14,13 @@ import type {
   FunctionReference,
 } from "convex/server";
 import type * as analytics from "../analytics.js";
+import type * as cleanupUser from "../cleanupUser.js";
 import type * as courierIntegrations from "../courierIntegrations.js";
 import type * as customerDashboard from "../customerDashboard.js";
 import type * as customerOrders from "../customerOrders.js";
+import type * as emails from "../emails.js";
 import type * as files from "../files.js";
+import type * as fixUserRole from "../fixUserRole.js";
 import type * as fixUsers from "../fixUsers.js";
 import type * as forwarderSettings from "../forwarderSettings.js";
 import type * as forwarderShipping from "../forwarderShipping.js";
@@ -47,10 +50,13 @@ import type * as warehouses from "../warehouses.js";
  */
 declare const fullApi: ApiFromModules<{
   analytics: typeof analytics;
+  cleanupUser: typeof cleanupUser;
   courierIntegrations: typeof courierIntegrations;
   customerDashboard: typeof customerDashboard;
   customerOrders: typeof customerOrders;
+  emails: typeof emails;
   files: typeof files;
+  fixUserRole: typeof fixUserRole;
   fixUsers: typeof fixUsers;
   forwarderSettings: typeof forwarderSettings;
   forwarderShipping: typeof forwarderShipping;

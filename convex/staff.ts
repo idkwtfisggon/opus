@@ -29,9 +29,9 @@ export const getForwarderStaff = query({
             const warehouse = await ctx.db.get(warehouseId as any);
             return warehouse ? {
               _id: warehouse._id,
-              name: warehouse.name,
-              city: warehouse.city,
-              state: warehouse.state
+              name: (warehouse as any).name,
+              city: (warehouse as any).city,
+              state: (warehouse as any).state
             } : null;
           })
         );
@@ -64,10 +64,10 @@ export const getStaffByUserId = query({
         const warehouse = await ctx.db.get(warehouseId as any);
         return warehouse ? {
           _id: warehouse._id,
-          name: warehouse.name,
-          city: warehouse.city,
-          state: warehouse.state,
-          country: warehouse.country
+          name: (warehouse as any).name,
+          city: (warehouse as any).city,
+          state: (warehouse as any).state,
+          country: (warehouse as any).country
         } : null;
       })
     );
@@ -121,7 +121,7 @@ export const createStaff = mutation({
     );
 
     const invalidWarehouses = warehouses.some(
-      (warehouse, index) => !warehouse || warehouse.forwarderId !== args.forwarderId
+      (warehouse, index) => !warehouse || (warehouse as any).forwarderId !== args.forwarderId
     );
 
     if (invalidWarehouses) {
@@ -175,7 +175,7 @@ export const updateStaff = mutation({
       );
 
       const invalidWarehouses = warehouses.some(
-        warehouse => !warehouse || warehouse.forwarderId !== staff.forwarderId
+        warehouse => !warehouse || (warehouse as any).forwarderId !== (staff as any).forwarderId
       );
 
       if (invalidWarehouses) {
@@ -219,28 +219,28 @@ export const getOrdersForStaff = query({
   },
   handler: async (ctx, { staffId, status, limit = 50 }) => {
     const staff = await ctx.db.get(staffId as any);
-    if (!staff || !staff.isActive) {
+    if (!staff || !(staff as any).isActive) {
       return [];
     }
 
     // Get orders from assigned warehouses only
     let ordersQuery = ctx.db
       .query("orders")
-      .withIndex("by_forwarder", (q) => q.eq("forwarderId", staff.forwarderId));
+      .withIndex("by_forwarder", (q) => q.eq("forwarderId", (staff as any).forwarderId));
 
     const allOrders = await ordersQuery.collect();
 
     // Filter by assigned warehouses and status
     let filteredOrders = allOrders.filter(order => 
-      staff.assignedWarehouses.includes(order.warehouseId)
+      (staff as any).assignedWarehouses.includes((order as any).warehouseId)
     );
 
     if (status) {
-      filteredOrders = filteredOrders.filter(order => order.status === status);
+      filteredOrders = filteredOrders.filter(order => (order as any).status === status);
     }
 
     // Sort by most recent first and limit
-    filteredOrders.sort((a, b) => b.createdAt - a.createdAt);
+    filteredOrders.sort((a, b) => (b as any).createdAt - (a as any).createdAt);
     
     return filteredOrders.slice(0, limit);
   },
@@ -274,19 +274,19 @@ export const findOrderByTrackingNumber = query({
     }
 
     const order = matchingOrders[0];
-    const warehouse = await ctx.db.get(order.warehouseId as any);
+    const warehouse = await ctx.db.get((order as any).warehouseId as any);
 
     return {
       found: true,
       order: {
         _id: order._id,
-        trackingNumber: order.trackingNumber,
-        customerName: order.customerName,
-        status: order.status,
-        forwarderId: order.forwarderId
+        trackingNumber: (order as any).trackingNumber,
+        customerName: (order as any).customerName,
+        status: (order as any).status,
+        forwarderId: (order as any).forwarderId
       },
-      warehouseName: warehouse?.name || "Unknown",
-      warehouseId: order.warehouseId
+      warehouseName: (warehouse as any)?.name || "Unknown",
+      warehouseId: (order as any).warehouseId
     };
   },
 });
@@ -311,16 +311,16 @@ export const findOrderAnywhere = query({
       return { found: false, totalOrders: orders.length };
     }
 
-    const warehouse = await ctx.db.get(matchingOrder.warehouseId as any);
+    const warehouse = await ctx.db.get((matchingOrder as any).warehouseId as any);
 
     return {
       found: true,
       order: {
-        trackingNumber: matchingOrder.trackingNumber,
-        forwarderId: matchingOrder.forwarderId,
-        warehouseId: matchingOrder.warehouseId
+        trackingNumber: (matchingOrder as any).trackingNumber,
+        forwarderId: (matchingOrder as any).forwarderId,
+        warehouseId: (matchingOrder as any).warehouseId
       },
-      warehouseName: warehouse?.name || "Unknown"
+      warehouseName: (warehouse as any)?.name || "Unknown"
     };
   },
 });
@@ -341,7 +341,7 @@ export const directOrderLookup = query({
       
       if (!order && trackingNumber) {
         const orders = await ctx.db.query("orders").collect();
-        order = orders.find(o => o.trackingNumber === trackingNumber);
+        order = orders.find(o => (o as any).trackingNumber === trackingNumber);
       }
       
       if (!order) {
@@ -353,24 +353,24 @@ export const directOrderLookup = query({
         };
       }
       
-      const warehouse = await ctx.db.get(order.warehouseId as any);
+      const warehouse = await ctx.db.get((order as any).warehouseId as any);
       
       return {
         found: true,
         order: {
           _id: order._id,
-          trackingNumber: order.trackingNumber,
-          forwarderId: order.forwarderId,
-          warehouseId: order.warehouseId,
-          customerName: order.customerName
+          trackingNumber: (order as any).trackingNumber,
+          forwarderId: (order as any).forwarderId,
+          warehouseId: (order as any).warehouseId,
+          customerName: (order as any).customerName
         },
         warehouse: {
           _id: warehouse?._id,
-          name: warehouse?.name
+          name: (warehouse as any)?.name
         }
       };
     } catch (error) {
-      return { error: error.message };
+      return { error: (error as any).message };
     }
   },
 });
@@ -386,18 +386,18 @@ export const debugStaffWarehouseAssignments = query({
       // Get all orders for this forwarder
       const allOrders = await ctx.db
         .query("orders")
-        .withIndex("by_forwarder", (q) => q.eq("forwarderId", staff.forwarderId))
+        .withIndex("by_forwarder", (q) => q.eq("forwarderId", (staff as any).forwarderId))
         .collect();
 
       // Get unique warehouse IDs from orders
-      const orderWarehouseIds = [...new Set(allOrders.map(o => o.warehouseId))];
+      const orderWarehouseIds = [...new Set(allOrders.map(o => (o as any).warehouseId))];
 
       // Get warehouse names
       const warehouses = await Promise.all(
         orderWarehouseIds.map(async (id) => {
           try {
             const w = await ctx.db.get(id as any);
-            return { id, name: w?.name || "Unknown" };
+            return { id, name: (w as any)?.name || "Unknown" };
           } catch (e) {
             return { id, name: "Error loading" };
           }
@@ -406,10 +406,10 @@ export const debugStaffWarehouseAssignments = query({
 
       // Get staff assigned warehouse names
       const assignedWarehouses = await Promise.all(
-        staff.assignedWarehouses.map(async (id) => {
+        (staff as any).assignedWarehouses.map(async (id: any) => {
           try {
             const w = await ctx.db.get(id as any);
-            return { id, name: w?.name || "Unknown" };
+            return { id, name: (w as any)?.name || "Unknown" };
           } catch (e) {
             return { id, name: "Error loading" };
           }
@@ -418,20 +418,20 @@ export const debugStaffWarehouseAssignments = query({
 
       return {
         staffId: staff._id,
-        staffName: staff.name,
-        forwarderId: staff.forwarderId,
+        staffName: (staff as any).name,
+        forwarderId: (staff as any).forwarderId,
         totalOrdersInForwarder: allOrders.length,
         assignedWarehouses,
         orderWarehouses: warehouses,
-        warehouseIdMatch: staff.assignedWarehouses.some(id => 
+        warehouseIdMatch: (staff as any).assignedWarehouses.some((id: any) => 
           orderWarehouseIds.includes(id)
         ),
-        rawStaffWarehouses: staff.assignedWarehouses,
+        rawStaffWarehouses: (staff as any).assignedWarehouses,
         rawOrderWarehouses: orderWarehouseIds
       };
     } catch (error) {
       return { 
-        error: `Debug query failed: ${error.message}`,
+        error: `Debug query failed: ${(error as any).message}`,
         staffId 
       };
     }
@@ -479,8 +479,8 @@ export const getStaffActivity = query({
 
         return {
           ...activity,
-          staffName: staff?.name || "Unknown Staff",
-          warehouseName: warehouse?.name || "Unknown Warehouse"
+          staffName: (staff as any)?.name || "Unknown Staff",
+          warehouseName: (warehouse as any)?.name || "Unknown Warehouse"
         };
       })
     );
@@ -622,7 +622,7 @@ export const joinWithInviteCode = mutation({
     }
     
     // Validate that the user's email matches the invite email
-    if (args.email.toLowerCase() !== invite.email.toLowerCase()) {
+    if (args.email.toLowerCase() !== invite.email!.toLowerCase()) {
       throw new Error("This invite code was created for a different email address");
     }
     
@@ -640,8 +640,8 @@ export const joinWithInviteCode = mutation({
     const staffId = await ctx.db.insert("staff", {
       forwarderId: invite.forwarderId,
       userId: args.userId,
-      name: invite.name, // Use name from invite
-      email: invite.email, // Use email from invite (already validated)
+      name: invite.name!, // Use name from invite
+      email: invite.email!, // Use email from invite (already validated)
       role: invite.role,
       assignedWarehouses: [invite.warehouseId],
       permissions: invite.permissions,
@@ -682,7 +682,7 @@ function isValidStatusTransition(currentStatus: string, newStatus: string, staff
   // Check if the new status is in the valid progressions for current status
   const validNextStatuses = STATUS_PROGRESSION[currentStatus as keyof typeof STATUS_PROGRESSION] || [];
   
-  if (validNextStatuses.includes(newStatus)) {
+  if ((validNextStatuses as string[]).includes(newStatus)) {
     return { isValid: true };
   }
 
@@ -725,29 +725,29 @@ export const updateOrderStatus = mutation({
 
     // Get the staff member
     const staff = await ctx.db.get(args.staffId as any);
-    if (!staff || !staff.isActive) {
+    if (!staff || !(staff as any).isActive) {
       throw new Error("Staff member not found or inactive");
     }
 
     // Verify staff has permission to update order status
-    if (!staff.permissions.canUpdateOrderStatus) {
+    if (!(staff as any).permissions.canUpdateOrderStatus) {
       throw new Error("You don't have permission to update order status");
     }
 
     // Verify staff is assigned to this warehouse
-    if (!staff.assignedWarehouses.includes(order.warehouseId)) {
+    if (!(staff as any).assignedWarehouses.includes((order as any).warehouseId)) {
       throw new Error("You are not assigned to this warehouse");
     }
 
     // Validate status transition
-    const validation = isValidStatusTransition(order.status, args.newStatus, staff.role);
+    const validation = isValidStatusTransition((order as any).status, args.newStatus, (staff as any).role);
     if (!validation.isValid) {
       throw new Error(validation.reason || "Invalid status transition");
     }
 
     // Check if this is a forward progression or a reversal
     const statusOrder = ["incoming", "arrived_at_warehouse", "packed", "awaiting_pickup", "in_transit", "delivered"];
-    const currentIndex = statusOrder.indexOf(order.status);
+    const currentIndex = statusOrder.indexOf((order as any).status);
     const newIndex = statusOrder.indexOf(args.newStatus);
     const isForwardProgression = newIndex > currentIndex;
 
@@ -779,13 +779,13 @@ export const updateOrderStatus = mutation({
     // Log the status change in order history
     await ctx.db.insert("orderStatusHistory", {
       orderId: args.orderId,
-      previousStatus: order.status,
+      previousStatus: (order as any).status,
       newStatus: args.newStatus,
       changedBy: args.staffId,
       changedByType: "staff",
-      staffName: staff.name,
-      warehouseName: order.warehouseId, // Will be resolved later if needed
-      notes: isForwardProgression ? args.notes : `${args.notes} (Status reversal by ${staff.role})`,
+      staffName: (staff as any).name,
+      warehouseName: (order as any).warehouseId, // Will be resolved later if needed
+      notes: isForwardProgression ? args.notes : `${args.notes} (Status reversal by ${(staff as any).role})`,
       scanData: args.scanData,
       changedAt: Date.now(),
     });
@@ -793,12 +793,12 @@ export const updateOrderStatus = mutation({
     // Log staff activity
     await ctx.db.insert("staffActivity", {
       staffId: args.staffId,
-      forwarderId: staff.forwarderId,
-      warehouseId: order.warehouseId,
+      forwarderId: (staff as any).forwarderId,
+      warehouseId: (order as any).warehouseId,
       activityType: "status_update",
       orderId: args.orderId,
       details: {
-        oldStatus: order.status,
+        oldStatus: (order as any).status,
         newStatus: args.newStatus,
         scanLocation: args.scanData?.location,
       },
@@ -808,7 +808,7 @@ export const updateOrderStatus = mutation({
     return { 
       success: true, 
       message: `Order status updated to ${args.newStatus}`,
-      previousStatus: order.status,
+      previousStatus: (order as any).status,
       newStatus: args.newStatus 
     };
   },
@@ -828,8 +828,8 @@ export const getValidNextStatuses = query({
       return [];
     }
 
-    const currentStatus = order.status;
-    const staffRole = staff.role;
+    const currentStatus = (order as any).status;
+    const staffRole = (staff as any).role;
     const validNextStatuses = STATUS_PROGRESSION[currentStatus as keyof typeof STATUS_PROGRESSION] || [];
     
     // If supervisor/manager, they can also go backwards (show all statuses except delivered if not delivered)

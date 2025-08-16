@@ -1,5 +1,6 @@
-import { mutation, query, internal } from "./_generated/server";
+import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { internal } from "./_generated/api";
 
 // Create a new parcel condition record
 export const createConditionRecord = mutation({
@@ -119,7 +120,6 @@ export const updateWithAIAnalysis = mutation({
   },
   handler: async (ctx, args) => {
     await ctx.db.patch(args.conditionId as any, {
-      photoQuality: args.photoQuality,
       aiDamageSuggestions: args.aiDamageSuggestions,
       ...(args.scaleReference && {
         scaleReference: {
@@ -131,7 +131,7 @@ export const updateWithAIAnalysis = mutation({
         measuredDimensions: args.measuredDimensions,
       }),
       requiresReview: args.aiDamageSuggestions.flaggedForReview,
-    });
+    } as any);
   },
 });
 
@@ -330,9 +330,9 @@ export const processPackageAnalysis = mutation({
       processingTimeMs: v.number(),
     })),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<any> => {
     // Use real OpenCV results if provided, otherwise fall back to mock
-    let dimensionResult;
+    let dimensionResult: any;
     
     if (args.dimensionResults) {
       // Update with real OpenCV results from frontend
@@ -345,18 +345,60 @@ export const processPackageAnalysis = mutation({
         conditionId: args.conditionId,
       };
     } else {
-      // Fallback to mock calculation
-      dimensionResult = await mockDimensionCalculation.handler(ctx, {
-        conditionId: args.conditionId,
-        frontPhotoStorageId: args.frontPhotoStorageId,
-        sidePhotoStorageId: args.sidePhotoStorageId,
+      // Fallback to mock calculation - inline the logic
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      const mockDimensions = {
+        detectedRuler: {
+          pixelsPerMm: 3.5 + Math.random() * 1,
+          rulerCorners: [
+            { x: 50, y: 30 },
+            { x: 350, y: 35 },
+            { x: 345, y: 180 },
+            { x: 45, y: 175 },
+          ],
+          perspectiveCorrected: true,
+        },
+        calculatedDimensions: {
+          length_mm: 150 + Math.random() * 200,
+          width_mm: 100 + Math.random() * 150,
+          height_mm: 50 + Math.random() * 100,
+          dim_weight: 0,
+          confidence: 0.8 + Math.random() * 0.2,
+        },
+        processingTimeMs: 1200 + Math.random() * 800,
+      };
+      
+      const { length_mm, width_mm, height_mm } = mockDimensions.calculatedDimensions;
+      mockDimensions.calculatedDimensions.dim_weight = (length_mm * width_mm * height_mm) / 5000;
+      
+      await ctx.db.patch(args.conditionId as any, {
+        dimensionCalculation: mockDimensions,
       });
+      
+      dimensionResult = {
+        ...mockDimensions,
+        conditionId: args.conditionId,
+      };
     }
     
-    // Initialize manual damage assessment
-    const damageResult = await initializeManualDamageAssessment.handler(ctx, {
-      conditionId: args.conditionId,
+    // Initialize manual damage assessment - inline the logic
+    const now = Date.now();
+    const manualResults = {
+      manualAssessment: true,
+      flaggedForReview: false,
+      processingTimeMs: 0,
+      analysisDate: now,
+    };
+    
+    await ctx.db.patch(args.conditionId as any, {
+      damageDetection: manualResults,
     });
+    
+    const damageResult = {
+      ...manualResults,
+      conditionId: args.conditionId,
+    };
     
     return {
       dimensions: dimensionResult,

@@ -109,7 +109,7 @@ export const testCourierApi = mutation({
       const testResult = {
         timestamp: Date.now(),
         success,
-        error: success ? undefined : (rateTestResult.error || labelTestResult.error),
+        error: success ? undefined : ((rateTestResult as any).error || (labelTestResult as any).error),
         rateTest: rateTestResult.success,
         labelTest: labelTestResult.success,
       };
@@ -126,7 +126,7 @@ export const testCourierApi = mutation({
       const testResult = {
         timestamp: Date.now(),
         success: false,
-        error: error.message,
+        error: (error as any).message,
         rateTest: false,
         labelTest: false,
       };
@@ -304,7 +304,7 @@ export const createShippingLabel = mutation({
     // Get courier integration
     const integration = await ctx.db
       .query("courierIntegrations")
-      .withIndex("by_forwarder", (q) => q.eq("forwarderId", order.forwarderId))
+      .withIndex("by_forwarder", (q) => q.eq("forwarderId", (order as any).forwarderId))
       .filter((q) => q.eq(q.field("courierName"), args.courierName))
       .first();
 
@@ -322,7 +322,7 @@ export const createShippingLabel = mutation({
     // Create shipping label record
     const labelId = await ctx.db.insert("shippingLabels", {
       orderId: args.orderId,
-      forwarderId: order.forwarderId,
+      forwarderId: (order as any).forwarderId,
       courierIntegrationId: integration._id,
       courierName: args.courierName,
       serviceName: args.serviceName,
@@ -339,16 +339,16 @@ export const createShippingLabel = mutation({
         phone: "+1-555-0123"
       },
       toAddress: {
-        name: order.customerName,
-        address: order.shippingAddress || "Customer Address",
+        name: (order as any).customerName,
+        address: (order as any).shippingAddress || "Customer Address",
         city: "Singapore",
         postalCode: "123456",
         country: "SG"
       },
       
-      weight: order.declaredWeight,
-      declaredValue: order.declaredValue,
-      currency: order.currency,
+      weight: (order as any).declaredWeight,
+      declaredValue: (order as any).declaredValue,
+      currency: (order as any).currency,
       
       status: "created",
       createdAt: Date.now(),
@@ -404,7 +404,7 @@ export const updateTrackingNumber = mutation({
     // Create a manual shipping label record
     const labelId = await ctx.db.insert("shippingLabels", {
       orderId: args.orderId,
-      forwarderId: order.forwarderId,
+      forwarderId: (order as any).forwarderId,
       courierIntegrationId: "manual", // Special ID for manual entries
       courierName: args.courierName,
       serviceName: "Manual Entry",
@@ -419,16 +419,16 @@ export const updateTrackingNumber = mutation({
         country: "US"
       },
       toAddress: {
-        name: order.customerName,
-        address: order.shippingAddress || "Customer Address",
+        name: (order as any).customerName,
+        address: (order as any).shippingAddress || "Customer Address",
         city: "Customer City",
         postalCode: "12345",
         country: "SG"
       },
       
-      weight: order.declaredWeight,
-      declaredValue: order.declaredValue,
-      currency: order.currency,
+      weight: (order as any).declaredWeight,
+      declaredValue: (order as any).declaredValue,
+      currency: (order as any).currency,
       
       status: "printed",
       createdAt: Date.now(),

@@ -50,7 +50,7 @@ export const createWarehouse = mutation({
     
     const warehouseId = await ctx.db.insert("warehouses", {
       ...args,
-      operatingHours: args.operatingHours || defaultOperatingHours,
+      operatingHours: args.operatingHours || defaultOperatingHours as any,
       currentCapacity: 0,
       isActive: true,
       createdAt: now,

@@ -820,6 +820,70 @@ export default defineSchema({
     .index("by_timestamp", ["timestamp"])
     .index("by_damage_assessment", ["finalDamageAssessment"]),
 
+  // Email processing for shipping confirmations
+  emailMessages: defineTable({
+    customerId: v.string(), // Customer who owns this email
+    customerEmail: v.string(), // The generated email address (cust-123@domain.com)
+    
+    // Original email data
+    from: v.string(), // Sender email
+    to: v.string(), // Recipient (should match customerEmail)
+    subject: v.string(),
+    body: v.string(), // HTML or text content
+    attachments: v.array(v.object({
+      filename: v.string(),
+      contentType: v.string(),
+      storageId: v.string(), // Convex storage ID for attachment
+      size: v.number(),
+    })),
+    
+    // Email processing results
+    isShippingEmail: v.boolean(), // Passed spam detection
+    confidence: v.number(), // 0-1 confidence score
+    extractedData: v.object({
+      trackingNumbers: v.array(v.string()),
+      orderNumbers: v.array(v.string()),
+      shopName: v.optional(v.string()),
+      estimatedValue: v.optional(v.number()),
+      currency: v.optional(v.string()),
+      weight: v.optional(v.number()),
+    }),
+    
+    // Processing status
+    isProcessed: v.boolean(),
+    isForwarded: v.boolean(), // Forwarded to customer's real email
+    forwardedAt: v.optional(v.number()),
+    matchedOrderId: v.optional(v.string()), // If matched to existing order
+    
+    // Spam detection
+    spamScore: v.number(), // 0-1, higher = more likely spam
+    spamReasons: v.array(v.string()), // Why flagged as spam
+    
+    // Metadata
+    receivedAt: v.number(),
+    processedAt: v.number(),
+    mailgunEventId: v.optional(v.string()), // Mailgun's event ID
+  }).index("by_customer", ["customerId"])
+    .index("by_customer_email", ["customerEmail"])
+    .index("by_is_shipping", ["isShippingEmail"])
+    .index("by_matched_order", ["matchedOrderId"])
+    .index("by_received_at", ["receivedAt"])
+    .index("by_tracking_number", ["extractedData.trackingNumbers"]),
+
+  // Customer email addresses (generated for each customer)
+  customerEmailAddresses: defineTable({
+    customerId: v.string(),
+    emailAddress: v.string(), // cust-123@yourdomain.com
+    realEmail: v.string(), // Customer's actual email for forwarding
+    isActive: v.boolean(),
+    createdAt: v.number(),
+    lastUsedAt: v.optional(v.number()),
+    totalEmailsReceived: v.number(),
+    totalEmailsForwarded: v.number(),
+  }).index("by_customer", ["customerId"])
+    .index("by_email_address", ["emailAddress"])
+    .index("by_real_email", ["realEmail"]),
+
   // Keep existing tables (commented for now)
   subscriptions: defineTable({
     userId: v.optional(v.string()),

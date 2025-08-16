@@ -153,10 +153,10 @@ export const findWarehousesForOrigin = query({
     // Get warehouse details for each matching service area
     const warehousesWithDetails = await Promise.all(
       matchingServiceAreas.map(async (serviceArea) => {
-        const warehouse = await ctx.db.get(serviceArea.warehouseId);
+        const warehouse = await ctx.db.get((serviceArea as any).warehouseId as any);
         if (!warehouse) return null;
 
-        const forwarder = await ctx.db.get(warehouse.forwarderId);
+        const forwarder = await ctx.db.get((warehouse as any).forwarderId as any);
         if (!forwarder) return null;
 
         // Find the coverage that matches this origin
@@ -179,15 +179,15 @@ export const findWarehousesForOrigin = query({
 
     // Sort based on criteria
     if (args.sortBy === "speed") {
-      validWarehouses.sort((a, b) => a.serviceArea.handlingTimeHours - b.serviceArea.handlingTimeHours);
+      validWarehouses.sort((a, b) => a!.serviceArea.handlingTimeHours - b!.serviceArea.handlingTimeHours);
     } else if (args.sortBy === "price") {
       // Will need to integrate with shipping rates - for now sort by additional fees
-      validWarehouses.sort((a, b) => (a.serviceArea.additionalFees || 0) - (b.serviceArea.additionalFees || 0));
+      validWarehouses.sort((a, b) => (a!.serviceArea.additionalFees || 0) - (b!.serviceArea.additionalFees || 0));
     } else {
       // Default: sort by priority (1=primary area first), then by handling time
       validWarehouses.sort((a, b) => {
-        if (a.priority !== b.priority) return a.priority - b.priority;
-        return a.serviceArea.handlingTimeHours - b.serviceArea.handlingTimeHours;
+        if (a!.priority !== b!.priority) return a!.priority - b!.priority;
+        return a!.serviceArea.handlingTimeHours - b!.serviceArea.handlingTimeHours;
       });
     }
 
@@ -406,7 +406,7 @@ export const toggleServiceAreaStatus = mutation({
     if (!identity) throw new Error("Not authenticated");
 
     // Verify ownership
-    const warehouse = await ctx.db.get(args.warehouseId);
+    const warehouse = await ctx.db.get(args.warehouseId as any);
     if (!warehouse) throw new Error("Warehouse not found");
 
     const forwarder = await ctx.db

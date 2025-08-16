@@ -156,7 +156,7 @@ export const seedForwarderShippingData = mutation({
     for (const rate of rateData) {
       const rateId = await ctx.db.insert("shippingRates", {
         forwarderId,
-        ...rate,
+        ...(rate as any),
         currentCapacityUsed: Math.floor(Math.random() * 80), // Random capacity usage
         isActive: true,
         createdAt: Date.now(),
@@ -179,7 +179,7 @@ export const seedForwarderShippingData = mutation({
     for (const rate of europeRates) {
       const rateId = await ctx.db.insert("shippingRates", {
         forwarderId,
-        ...rate,
+        ...(rate as any),
         currentCapacityUsed: Math.floor(Math.random() * 60),
         isActive: true,
         createdAt: Date.now(),
@@ -300,23 +300,16 @@ export const seedTestOrders = mutation({
     for (const orderData of testOrders) {
       const orderId = await ctx.db.insert("orders", {
         ...orderData,
+        status: orderData.status as "incoming" | "received" | "arrived_at_warehouse" | "packed" | "awaiting_pickup" | "shipped" | "in_transit" | "delivered",
+        customerId: `customer-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         forwarderId,
         warehouseId,
         customerEmail: `${orderData.customerName.toLowerCase().replace(' ', '.')}@test.com`,
-        merchantEmail: `${orderData.merchantName.toLowerCase().replace(' ', '.')}@merchant.com`,
-        shippingAddress: {
-          street: "123 Test Street",
-          city: "Singapore",
-          state: "Singapore",
-          country: "Singapore",
-          postalCode: "123456"
-        },
-        dimensions: {
-          length: 20,
-          width: 15,
-          height: 10
-        },
+        shippingAddress: "123 Test Street, Singapore 123456",
+        dimensions: "20cm x 15cm x 10cm",
         specialInstructions: orderData.status === "awaiting_pickup" ? "Handle with care - fragile items" : undefined,
+        shippingType: "immediate" as "immediate" | "consolidated",
+        labelPrinted: false,
         createdAt: now - (Math.random() * 24 * 60 * 60 * 1000), // Random time in last 24h
         updatedAt: now,
         // Add timestamps based on status

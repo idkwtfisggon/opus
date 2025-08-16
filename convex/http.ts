@@ -125,7 +125,7 @@ http.route({
 
       return Response.json({
         success: true,
-        options: shippingOptions.map(option => ({
+        options: shippingOptions.map((option: any) => ({
           id: option.rateId,
           forwarder: option.forwarder.name,
           warehouse: `${option.warehouse.city}, ${option.warehouse.country}`,

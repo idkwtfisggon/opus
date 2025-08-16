@@ -34,39 +34,39 @@ export const getForwarderOrders = query({
 
     // Filter by forwarder if we used status index
     if (status) {
-      orders = orders.filter(order => order.forwarderId === forwarderId);
+      orders = orders.filter(order => (order as any).forwarderId === forwarderId);
     }
 
     // Filter by warehouse if specified
     if (warehouseId) {
-      orders = orders.filter(order => order.warehouseId === warehouseId);
+      orders = orders.filter(order => (order as any).warehouseId === warehouseId);
     }
 
     // Search functionality
     if (searchQuery) {
       const searchLower = searchQuery.toLowerCase();
       orders = orders.filter(order => 
-        order.trackingNumber.toLowerCase().includes(searchLower) ||
-        order.customerName.toLowerCase().includes(searchLower) ||
-        order.merchantName.toLowerCase().includes(searchLower)
+        (order as any).trackingNumber.toLowerCase().includes(searchLower) ||
+        (order as any).customerName.toLowerCase().includes(searchLower) ||
+        (order as any).merchantName.toLowerCase().includes(searchLower)
       );
     }
 
     // Sort by creation time (newest first)
-    orders.sort((a, b) => b.createdAt - a.createdAt);
+    orders.sort((a, b) => (b as any).createdAt - (a as any).createdAt);
 
     // Get warehouse details for each order
     const ordersWithWarehouses = await Promise.all(
       orders.map(async (order) => {
-        const warehouse = await ctx.db.get(order.warehouseId as any);
+        const warehouse = await ctx.db.get((order as any).warehouseId as any);
         return {
           ...order,
           warehouse: warehouse ? {
             _id: warehouse._id,
-            name: warehouse.name,
-            city: warehouse.city,
-            state: warehouse.state,
-            country: warehouse.country,
+            name: (warehouse as any).name,
+            city: (warehouse as any).city,
+            state: (warehouse as any).state,
+            country: (warehouse as any).country,
           } : null,
         };
       })
@@ -116,34 +116,35 @@ export const splitOrderToWarehouse = mutation({
 
     // Create new order for split items
     const newOrderId = await ctx.db.insert("orders", {
-      customerId: originalOrder.customerId,
-      customerName: originalOrder.customerName,
-      customerEmail: originalOrder.customerEmail,
-      customerPhone: originalOrder.customerPhone,
-      shippingAddress: originalOrder.shippingAddress,
-      trackingNumber: `${originalOrder.trackingNumber}-SPLIT-${Date.now()}`,
-      merchantName: originalOrder.merchantName,
-      merchantOrderId: originalOrder.merchantOrderId,
+      customerId: (originalOrder as any).customerId,
+      customerName: (originalOrder as any).customerName,
+      customerEmail: (originalOrder as any).customerEmail,
+      customerPhone: (originalOrder as any).customerPhone,
+      shippingAddress: (originalOrder as any).shippingAddress,
+      trackingNumber: `${(originalOrder as any).trackingNumber}-SPLIT-${Date.now()}`,
+      merchantName: (originalOrder as any).merchantName,
+      merchantOrderId: (originalOrder as any).merchantOrderId,
       declaredWeight: splitWeight,
       declaredValue: splitValue,
-      currency: originalOrder.currency,
+      currency: (originalOrder as any).currency,
       packageDescription: items.map(item => `${item.quantity}x ${item.description}`).join(', '),
-      specialInstructions: notes || `Split from ${originalOrder.trackingNumber}`,
+      specialInstructions: notes || `Split from ${(originalOrder as any).trackingNumber}`,
       warehouseId: targetWarehouseId,
-      forwarderId: originalOrder.forwarderId,
+      forwarderId: (originalOrder as any).forwarderId,
       status: "incoming",
-      shippingType: originalOrder.shippingType,
-      courier: originalOrder.courier,
+      shippingType: (originalOrder as any).shippingType,
+      courier: (originalOrder as any).courier,
+      labelPrinted: false,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     });
 
     // Update original order to reflect the split
     await ctx.db.patch(originalOrder._id, {
-      declaredWeight: Math.max(0, originalOrder.declaredWeight - splitWeight),
-      declaredValue: Math.max(0, originalOrder.declaredValue - splitValue),
-      specialInstructions: (originalOrder.specialInstructions || "") + 
-        ` | Split: ${items.length} item(s) moved to ${targetWarehouse.name}`,
+      declaredWeight: Math.max(0, (originalOrder as any).declaredWeight - splitWeight),
+      declaredValue: Math.max(0, (originalOrder as any).declaredValue - splitValue),
+      specialInstructions: ((originalOrder as any).specialInstructions || "") + 
+        ` | Split: ${items.length} item(s) moved to ${(targetWarehouse as any).name}`,
       updatedAt: Date.now(),
     });
 
@@ -161,19 +162,19 @@ export const getForwarderStats = query({
       .collect();
 
     // Calculate stats based on Shibubu logic
-    const pendingOrders = orders.filter(o => o.status === "incoming").length;
-    const readyToShip = orders.filter(o => o.status === "awaiting_pickup").length;
+    const pendingOrders = orders.filter(o => (o as any).status === "incoming").length;
+    const readyToShip = orders.filter(o => (o as any).status === "awaiting_pickup").length;
     
     // Pending labels: orders that are packed/ready but haven't had labels printed
     const pendingLabels = orders.filter(o => 
-      ["packed", "awaiting_pickup"].includes(o.status) && !o.labelPrinted
+      ["packed", "awaiting_pickup"].includes((o as any).status) && !(o as any).labelPrinted
     ).length;
     
     // Get stale orders (>48h old and not progressing)
     const twoDaysAgo = Date.now() - (2 * 24 * 60 * 60 * 1000);
     const staleOrders = orders.filter(o => 
-      ["incoming", "arrived_at_warehouse"].includes(o.status) && 
-      o.createdAt < twoDaysAgo
+      ["incoming", "arrived_at_warehouse"].includes((o as any).status) && 
+      (o as any).createdAt < twoDaysAgo
     ).length;
 
     // Get forwarder profile for parcel limits
@@ -182,7 +183,7 @@ export const getForwarderStats = query({
     // Calculate monthly parcel usage
     const currentMonth = new Date();
     const monthStart = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
-    const ordersThisMonth = orders.filter(o => o.createdAt >= monthStart.getTime()).length;
+    const ordersThisMonth = orders.filter(o => (o as any).createdAt >= monthStart.getTime()).length;
 
     // Get warehouse capacity
     const warehouses = await ctx.db
@@ -190,8 +191,8 @@ export const getForwarderStats = query({
       .withIndex("by_forwarder", (q) => q.eq("forwarderId", forwarderId))
       .collect();
 
-    const totalCapacity = warehouses.reduce((sum, w) => sum + w.maxParcels, 0);
-    const currentCapacity = warehouses.reduce((sum, w) => sum + w.currentCapacity, 0);
+    const totalCapacity = warehouses.reduce((sum, w) => sum + (w as any).maxParcels, 0);
+    const currentCapacity = warehouses.reduce((sum, w) => sum + (w as any).currentCapacity, 0);
     const capacityUsed = totalCapacity > 0 ? Math.round((currentCapacity / totalCapacity) * 100) : 0;
 
     // Monthly parcel limit usage (use default values for now)
@@ -275,12 +276,14 @@ export const createOrder = mutation({
     });
 
     // Create history entry
-    await ctx.db.insert("orderHistory", {
+    await ctx.db.insert("orderStatusHistory", {
       orderId,
+      previousStatus: "",
       newStatus: "incoming",
-      updatedBy: args.customerId, // Could be the customer or forwarder
+      changedBy: args.customerId, // Could be the customer or forwarder
+      changedByType: "system" as "forwarder" | "staff" | "system",
       notes: "Order created",
-      timestamp: now,
+      changedAt: now,
     });
 
     return orderId;
@@ -294,7 +297,7 @@ export const updateOrderStatus = mutation({
     newStatus: v.string(),
     notes: v.optional(v.string()),
     changedBy: v.string(),
-    changedByType: v.string(),
+    changedByType: v.union(v.literal("forwarder"), v.literal("staff"), v.literal("system")),
     scanData: v.optional(v.object({
       barcodeValue: v.string(),
       location: v.string(),
@@ -306,7 +309,7 @@ export const updateOrderStatus = mutation({
     if (!order) throw new Error("Order not found");
 
     const now = Date.now();
-    const previousStatus = order.status;
+    const previousStatus = (order as any).status;
 
     // Update the order
     const updateData: any = {
@@ -315,15 +318,15 @@ export const updateOrderStatus = mutation({
     };
 
     // Set specific timestamps based on status
-    if (newStatus === "arrived_at_warehouse" && !order.receivedAt) {
+    if (newStatus === "arrived_at_warehouse" && !(order as any).receivedAt) {
       updateData.receivedAt = now;
-    } else if (newStatus === "packed" && !order.packedAt) {
+    } else if (newStatus === "packed" && !(order as any).packedAt) {
       updateData.packedAt = now;
-    } else if (newStatus === "awaiting_pickup" && !order.awaitingPickupAt) {
+    } else if (newStatus === "awaiting_pickup" && !(order as any).awaitingPickupAt) {
       updateData.awaitingPickupAt = now;
-    } else if (newStatus === "in_transit" && !order.shippedAt) {
+    } else if (newStatus === "in_transit" && !(order as any).shippedAt) {
       updateData.shippedAt = now;
-    } else if (newStatus === "delivered" && !order.deliveredAt) {
+    } else if (newStatus === "delivered" && !(order as any).deliveredAt) {
       updateData.deliveredAt = now;
     }
 
@@ -364,13 +367,14 @@ export const assignCourier = mutation({
     });
 
     // Create history entry
-    await ctx.db.insert("orderHistory", {
+    await ctx.db.insert("orderStatusHistory", {
       orderId,
-      previousStatus: order.status,
-      newStatus: order.status,
-      updatedBy,
+      previousStatus: (order as any).status,
+      newStatus: (order as any).status,
+      changedBy: updatedBy,
+      changedByType: "staff",
       notes: `Courier assigned: ${courier}${courierTrackingNumber ? ` (${courierTrackingNumber})` : ''}`,
-      timestamp: Date.now(),
+      changedAt: Date.now(),
     });
 
     return orderId;
@@ -396,13 +400,14 @@ export const bulkAssignCourier = mutation({
         });
 
         // Create history entry
-        await ctx.db.insert("orderHistory", {
+        await ctx.db.insert("orderStatusHistory", {
           orderId,
-          previousStatus: order.status,
-          newStatus: order.status,
-          updatedBy,
+          previousStatus: (order as any).status,
+          newStatus: (order as any).status,
+          changedBy: updatedBy,
+          changedByType: "staff",
           notes: `Bulk courier assigned: ${courier}`,
-          timestamp: now,
+          changedAt: now,
         });
       }
     }
@@ -427,13 +432,14 @@ export const markLabelPrinted = mutation({
     });
 
     // Create history entry
-    await ctx.db.insert("orderHistory", {
+    await ctx.db.insert("orderStatusHistory", {
       orderId,
-      previousStatus: order.status,
-      newStatus: order.status,
-      updatedBy,
+      previousStatus: (order as any).status,
+      newStatus: (order as any).status,
+      changedBy: updatedBy,
+      changedByType: "staff",
       notes: "Label printed",
-      timestamp: Date.now(),
+      changedAt: Date.now(),
     });
 
     return orderId;
@@ -462,7 +468,7 @@ export const getOrderVolume = query({
     // Group by date
     const volumeByDate: Record<string, number> = {};
     orders.forEach(order => {
-      const dateKey = new Date(order.createdAt).toISOString().split('T')[0];
+      const dateKey = new Date((order as any).createdAt).toISOString().split('T')[0];
       volumeByDate[dateKey] = (volumeByDate[dateKey] || 0) + 1;
     });
 
@@ -501,7 +507,7 @@ export const deleteOrder = mutation({
       throw new Error("Order not found");
     }
     
-    if (order.forwarderId !== forwarderId) {
+    if ((order as any).forwarderId !== forwarderId) {
       throw new Error("Unauthorized: Order does not belong to this forwarder");
     }
     
@@ -517,7 +523,7 @@ export const deleteOrder = mutation({
     
     // Delete order history
     const orderHistory = await ctx.db
-      .query("orderHistory")
+      .query("orderStatusHistory")
       .filter((q) => q.eq(q.field("orderId"), orderId))
       .collect();
     
