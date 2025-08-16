@@ -1,5 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { internal } from "./_generated/api";
 
 export const findUserByToken = query({
   args: { tokenIdentifier: v.string() },
@@ -106,6 +107,17 @@ export const createUser = mutation({
       // Update existing user with role and additional data
       await ctx.db.patch(existingUser._id, updateData);
       console.log("createUser: Updated existing user, ID =", existingUser._id);
+      
+      // Auto-generate shopping email if user is now a customer and doesn't have one
+      if (args.role === "customer") {
+        try {
+          await ctx.runMutation("emails:autoGenerateCustomerEmail" as any, { customerId: existingUser._id });
+        } catch (error) {
+          console.error("Failed to generate customer email:", error);
+          // Don't fail the update if email generation fails
+        }
+      }
+      
       return existingUser._id;
     }
 
@@ -117,6 +129,17 @@ export const createUser = mutation({
     });
 
     console.log("createUser: Created new user, ID =", userId, "with tokenIdentifier =", identity.subject);
+    
+    // Auto-generate shopping email for customers
+    if (args.role === "customer") {
+      try {
+        await ctx.runMutation("emails:autoGenerateCustomerEmail" as any, { customerId: userId });
+      } catch (error) {
+        console.error("Failed to generate customer email:", error);
+        // Don't fail the user creation if email generation fails
+      }
+    }
+    
     return userId;
   },
 });

@@ -18,8 +18,63 @@ export const generateCustomerEmail = mutation({
       return existing;
     }
 
-    // Generate unique email address
-    const emailAddress = `cust-${customerId.slice(-8)}@sandbox66b2007e061f4536af04dca475932b61.mailgun.org`;
+    // Get customer details to create personalized email
+    const customer = await ctx.db.get(customerId as any);
+    if (!customer) {
+      throw new Error("Customer not found");
+    }
+
+    // Generate personalized email address using first name + last 7 digits of ID
+    const fullName = (customer as any).name || "customer";
+    const firstName = fullName.split(' ')[0].toLowerCase().replace(/[^a-z]/g, '');
+    const last7Digits = customerId.slice(-7);
+    const emailAddress = `${firstName}${last7Digits}@sandbox66b2007e061f4536af04dca475932b61.mailgun.org`;
+
+    // Create customer email record
+    const emailId = await ctx.db.insert("customerEmailAddresses", {
+      customerId,
+      emailAddress,
+      realEmail,
+      isActive: true,
+      createdAt: Date.now(),
+      totalEmailsReceived: 0,
+      totalEmailsForwarded: 0,
+    });
+
+    return await ctx.db.get(emailId);
+  },
+});
+
+// Auto-generate email for new customer (called during onboarding)
+export const autoGenerateCustomerEmail = mutation({
+  args: {
+    customerId: v.string(),
+  },
+  handler: async (ctx, { customerId }) => {
+    // Check if customer already has an email address
+    const existing = await ctx.db
+      .query("customerEmailAddresses")
+      .withIndex("by_customer", (q) => q.eq("customerId", customerId))
+      .first();
+
+    if (existing) {
+      return existing;
+    }
+
+    // Get customer details
+    const customer = await ctx.db.get(customerId as any);
+    if (!customer) {
+      throw new Error("Customer not found");
+    }
+
+    // Generate personalized email address using first name + last 7 digits of ID
+    const fullName = (customer as any).name || "customer";
+    const firstName = fullName.split(' ')[0].toLowerCase().replace(/[^a-z]/g, '');
+    const last7Digits = customerId.slice(-7);
+    const emailAddress = `${firstName}${last7Digits}@sandbox66b2007e061f4536af04dca475932b61.mailgun.org`;
+
+    // Use the customer's signup email as the default forwarding email
+    const realEmail = (customer as any).email;
 
     // Create customer email record
     const emailId = await ctx.db.insert("customerEmailAddresses", {
@@ -44,6 +99,30 @@ export const getCustomerEmail = query({
       .query("customerEmailAddresses")
       .withIndex("by_customer", (q) => q.eq("customerId", customerId))
       .first();
+  },
+});
+
+// Update customer's forwarding email address
+export const updateForwardingEmail = mutation({
+  args: {
+    customerId: v.string(),
+    newRealEmail: v.string(),
+  },
+  handler: async (ctx, { customerId, newRealEmail }) => {
+    const customerEmail = await ctx.db
+      .query("customerEmailAddresses")
+      .withIndex("by_customer", (q) => q.eq("customerId", customerId))
+      .first();
+
+    if (!customerEmail) {
+      throw new Error("Customer email address not found");
+    }
+
+    await ctx.db.patch(customerEmail._id, {
+      realEmail: newRealEmail,
+    });
+
+    return await ctx.db.get(customerEmail._id);
   },
 });
 
@@ -75,15 +154,7 @@ export const processIncomingEmail = mutation({
     mailgunEventId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    // Extract customer ID from email address
-    const emailMatch = args.to.match(/cust-([a-zA-Z0-9]+)@/);
-    if (!emailMatch) {
-      throw new Error("Invalid customer email format");
-    }
-
-    const customerIdSuffix = emailMatch[1];
-    
-    // Find customer by email address
+    // Find customer by email address directly (supports both old and new formats)
     const customerEmail = await ctx.db
       .query("customerEmailAddresses")
       .withIndex("by_email_address", (q) => q.eq("emailAddress", args.to))

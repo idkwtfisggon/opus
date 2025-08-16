@@ -1,5 +1,4 @@
 // Email processing utilities for shipping confirmations
-import pdfParse from 'pdf-parse';
 
 // Extract tracking numbers from text using regex patterns
 export const extractTrackingNumbers = (text: string): string[] => {
@@ -164,6 +163,9 @@ export const processPDFAttachment = async (pdfBuffer: Buffer): Promise<{
   extractedData: any;
 }> => {
   try {
+    // Dynamic import to avoid SSR issues
+    const pdfParse = (await import('pdf-parse')).default;
+    
     // Extract text from PDF
     const pdfData = await pdfParse(pdfBuffer);
     const text = pdfData.text;

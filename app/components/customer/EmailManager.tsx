@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 
@@ -7,8 +7,8 @@ interface EmailManagerProps {
 }
 
 export default function EmailManager({ customerId }: EmailManagerProps) {
-  const [realEmail, setRealEmail] = useState("");
-  const [showEmailForm, setShowEmailForm] = useState(false);
+  const [newForwardingEmail, setNewForwardingEmail] = useState("");
+  const [showChangeEmailForm, setShowChangeEmailForm] = useState(false);
 
   // Get customer's email address
   const customerEmail = useQuery(api.emails.getCustomerEmail, { customerId });
@@ -22,22 +22,36 @@ export default function EmailManager({ customerId }: EmailManagerProps) {
     limit: 10 
   });
 
-  // Generate email address
-  const generateEmail = useMutation(api.emails.generateCustomerEmail);
+  // Auto-generate email if it doesn't exist
+  const autoGenerateEmail = useMutation(api.emails.autoGenerateCustomerEmail);
+  
+  // Update forwarding email
+  const updateForwardingEmail = useMutation(api.emails.updateForwardingEmail);
+
+  // Email should be auto-generated at account creation
+  // If somehow missing, show a generate button as fallback
 
   const handleGenerateEmail = async () => {
-    if (!realEmail.trim()) {
-      alert("Please enter your real email address");
+    try {
+      await autoGenerateEmail({ customerId });
+    } catch (error: any) {
+      console.error("Error generating email:", error);
+    }
+  };
+
+  const handleUpdateForwardingEmail = async () => {
+    if (!newForwardingEmail.trim()) {
+      alert("Please enter a valid email address");
       return;
     }
 
     try {
-      await generateEmail({
+      await updateForwardingEmail({
         customerId,
-        realEmail: realEmail.trim(),
+        newRealEmail: newForwardingEmail.trim(),
       });
-      setShowEmailForm(false);
-      setRealEmail("");
+      setShowChangeEmailForm(false);
+      setNewForwardingEmail("");
     } catch (error: any) {
       alert(`Error: ${error.message}`);
     }
@@ -53,6 +67,7 @@ export default function EmailManager({ customerId }: EmailManagerProps) {
         
         {customerEmail ? (
           <div className="space-y-4">
+            {/* Shopping Email Display */}
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -70,60 +85,83 @@ export default function EmailManager({ customerId }: EmailManagerProps) {
               </div>
             </div>
             
+            {/* Forwarding Email Settings */}
+            <div className="border border-gray-200 rounded-lg p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <p className="text-sm font-medium text-gray-700">Emails forwarded to:</p>
+                  <p className="text-sm text-gray-900">{customerEmail.realEmail}</p>
+                </div>
+                <button
+                  onClick={() => setShowChangeEmailForm(true)}
+                  className="text-blue-600 text-sm hover:text-blue-800"
+                >
+                  Change
+                </button>
+              </div>
+              
+              {showChangeEmailForm && (
+                <div className="space-y-3 mt-4 pt-4 border-t border-gray-200">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      New Forwarding Email
+                    </label>
+                    <input
+                      type="email"
+                      value={newForwardingEmail}
+                      onChange={(e) => setNewForwardingEmail(e.target.value)}
+                      placeholder="your.new.email@gmail.com"
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleUpdateForwardingEmail}
+                      className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm hover:bg-blue-700"
+                    >
+                      Update
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowChangeEmailForm(false);
+                        setNewForwardingEmail("");
+                      }}
+                      className="bg-gray-300 text-gray-700 px-4 py-2 rounded-md text-sm hover:bg-gray-400"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+            
             <div className="text-sm text-gray-600">
-              <p>• Use this email address when shopping online</p>
-              <p>• Shipping confirmations will be automatically forwarded to: <strong>{customerEmail.realEmail}</strong></p>
+              <p>• Use your shopping email address when shopping online</p>
+              <p>• Shipping confirmations will be automatically processed and forwarded</p>
               <p>• Our system will track and match your packages automatically</p>
+            </div>
+          </div>
+        ) : customerEmail === undefined ? (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+              <p className="text-gray-600">Generating your shopping email address...</p>
             </div>
           </div>
         ) : (
           <div className="space-y-4">
             <p className="text-gray-600">
-              Generate a unique email address for your online shopping. All shipping confirmations 
-              will be automatically processed and forwarded to your real email.
+              Your shopping email address will be automatically generated using your name. 
+              All shipping confirmations will be forwarded to your signup email.
             </p>
             
-            {!showEmailForm ? (
-              <button
-                onClick={() => setShowEmailForm(true)}
-                className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-              >
-                Generate Shopping Email
-              </button>
-            ) : (
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Your Real Email Address
-                  </label>
-                  <input
-                    type="email"
-                    value={realEmail}
-                    onChange={(e) => setRealEmail(e.target.value)}
-                    placeholder="your.email@gmail.com"
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Shipping confirmations will be forwarded here
-                  </p>
-                </div>
-                
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleGenerateEmail}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-                  >
-                    Generate Email
-                  </button>
-                  <button
-                    onClick={() => setShowEmailForm(false)}
-                    className="bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
+            <button
+              onClick={handleGenerateEmail}
+              className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+            >
+              Generate Shopping Email
+            </button>
           </div>
         )}
       </div>

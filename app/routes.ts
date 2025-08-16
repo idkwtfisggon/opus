@@ -20,6 +20,8 @@ export default [
   route("subscription-required", "routes/subscription-required.tsx"),
   route("print-label", "routes/print-label.tsx"),
   route("seed-data", "routes/seed-data.tsx"),
+  // API routes
+  route("api/webhooks/mailgun", "routes/api/webhooks/mailgun.ts"),
   layout("routes/dashboard/layout.tsx", [
     route("dashboard", "routes/dashboard/index.tsx"),
     route("dashboard/chat", "routes/dashboard/chat.tsx"),

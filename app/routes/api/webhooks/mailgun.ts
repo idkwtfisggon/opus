@@ -1,7 +1,7 @@
 import type { ActionFunction } from "react-router";
 import { fetchMutation } from "convex/nextjs";
-import { api } from "../../convex/_generated/api";
-import { processEmail } from "../utils/email-processing";
+import { api } from "../../../../convex/_generated/api";
+import { processEmail } from "../../../utils/email-processing";
 import Mailgun from 'mailgun.js';
 import FormData from 'form-data';
 
@@ -128,7 +128,7 @@ export const action: ActionFunction = async ({ request }) => {
       confidence: processingResult.confidence,
       spamScore: processingResult.spamScore,
       spamReasons: processingResult.spamReasons,
-      mailgunEventId: formData.get("Message-Id") as string,
+      mailgunEventId: formData.get("Message-Id") as string || undefined,
     });
 
     console.log(`Email stored with ID: ${emailId}`);
