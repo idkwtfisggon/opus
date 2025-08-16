@@ -3,6 +3,8 @@ import { fetchQuery } from "convex/nextjs";
 import { api } from "../../../convex/_generated/api";
 import { useQuery, useMutation } from "convex/react";
 import { useState } from "react";
+import ArrivalCapture from "../../components/parcel/ArrivalCapture";
+import HandoverCapture from "../../components/parcel/HandoverCapture";
 
 export async function loader(args: any) {
   const { userId } = await getAuth(args);
@@ -37,6 +39,8 @@ export default function StaffOrders({ loaderData }: any) {
   const { staff } = loaderData;
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
+  const [arrivalCaptureOrderId, setArrivalCaptureOrderId] = useState<string | null>(null);
+  const [handoverCaptureOrderId, setHandoverCaptureOrderId] = useState<string | null>(null);
 
   // Mutations
   const updateOrderStatus = useMutation(api.staff.updateOrderStatus);
@@ -50,6 +54,25 @@ export default function StaffOrders({ loaderData }: any) {
       limit: 100
     }
   );
+
+  // Get parcel conditions for verification status checking
+  const allConditions = useQuery(
+    api.parcelConditions.getConditionsRequiringReview,
+    { warehouseId: staff?.assignedWarehouses?.[0] }
+  );
+
+  // Helper function to check if order has arrival verification
+  const hasArrivalVerification = (orderId: string) => {
+    return allConditions?.some(condition => 
+      condition.orderId === orderId && condition.eventType === "arrival"
+    );
+  };
+
+  const hasHandoverVerification = (orderId: string) => {
+    return allConditions?.some(condition => 
+      condition.orderId === orderId && condition.eventType === "handover"
+    );
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -191,6 +214,28 @@ export default function StaffOrders({ loaderData }: any) {
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
                           {order.status.replace('_', ' ')}
                         </span>
+                        
+                        {/* Verification Status Indicators */}
+                        {order.status === "arrived_at_warehouse" && hasArrivalVerification(order._id) && (
+                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            📷 Arrival Verified
+                          </span>
+                        )}
+                        {order.status === "awaiting_pickup" && hasHandoverVerification(order._id) && (
+                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            📷 Handover Verified
+                          </span>
+                        )}
+                        {(order.status === "arrived_at_warehouse" && !hasArrivalVerification(order._id)) && (
+                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                            📷 Verification Needed
+                          </span>
+                        )}
+                        {(order.status === "awaiting_pickup" && !hasHandoverVerification(order._id)) && (
+                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                            📷 Handover Needed
+                          </span>
+                        )}
                       </div>
                       <div className="space-y-1">
                         <p className="text-sm text-foreground">
@@ -246,6 +291,26 @@ export default function StaffOrders({ loaderData }: any) {
                       📱 Scan Package
                     </a>
                     
+                    {/* Arrival Capture - only for incoming/received packages */}
+                    {(order.status === "incoming" || order.status === "received") && (
+                      <button
+                        onClick={() => setArrivalCaptureOrderId(order._id)}
+                        className="bg-green-600 text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-green-700 transition-colors"
+                      >
+                        📷 Verify Arrival
+                      </button>
+                    )}
+                    
+                    {/* Handover Capture - only for packed/awaiting pickup packages */}
+                    {(order.status === "packed" || order.status === "awaiting_pickup") && (
+                      <button
+                        onClick={() => setHandoverCaptureOrderId(order._id)}
+                        className="bg-orange-600 text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-orange-700 transition-colors"
+                      >
+                        🚚 Verify Handover
+                      </button>
+                    )}
+                    
                     {/* Status Update Buttons */}
                     {order.status === "incoming" && (
                       <button 
@@ -258,13 +323,29 @@ export default function StaffOrders({ loaderData }: any) {
                     )}
                     
                     {order.status === "arrived_at_warehouse" && (
-                      <button 
-                        onClick={() => handleStatusUpdate(order._id, "packed", order.trackingNumber)}
-                        disabled={updatingOrderId === order._id}
-                        className="bg-yellow-100 text-yellow-800 px-3 py-2 rounded-md text-sm font-medium hover:bg-yellow-200 transition-colors disabled:opacity-50"
-                      >
-                        {updatingOrderId === order._id ? "Updating..." : "Mark as Packed"}
-                      </button>
+                      <div className="flex gap-2">
+                        {!hasArrivalVerification(order._id) ? (
+                          <button 
+                            onClick={() => setArrivalCaptureOrderId(order._id)}
+                            className="bg-blue-100 text-blue-800 px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-200 transition-colors"
+                          >
+                            📷 Verify Arrival
+                          </button>
+                        ) : (
+                          <div className="flex gap-2">
+                            <div className="bg-green-100 text-green-800 px-3 py-2 rounded-md text-sm font-medium">
+                              ✅ Arrival Verified
+                            </div>
+                            <button 
+                              onClick={() => handleStatusUpdate(order._id, "packed", order.trackingNumber)}
+                              disabled={updatingOrderId === order._id}
+                              className="bg-yellow-100 text-yellow-800 px-3 py-2 rounded-md text-sm font-medium hover:bg-yellow-200 transition-colors disabled:opacity-50"
+                            >
+                              {updatingOrderId === order._id ? "Updating..." : "Mark as Packed"}
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     )}
                     
                     {order.status === "packed" && (
@@ -278,13 +359,29 @@ export default function StaffOrders({ loaderData }: any) {
                     )}
                     
                     {order.status === "awaiting_pickup" && (
-                      <button 
-                        onClick={() => handleStatusUpdate(order._id, "in_transit", order.trackingNumber)}
-                        disabled={updatingOrderId === order._id}
-                        className="bg-indigo-100 text-indigo-800 px-3 py-2 rounded-md text-sm font-medium hover:bg-indigo-200 transition-colors disabled:opacity-50"
-                      >
-                        {updatingOrderId === order._id ? "Updating..." : "Delivery in Progress"}
-                      </button>
+                      <div className="flex gap-2">
+                        {!hasHandoverVerification(order._id) ? (
+                          <button 
+                            onClick={() => setHandoverCaptureOrderId(order._id)}
+                            className="bg-orange-100 text-orange-800 px-3 py-2 rounded-md text-sm font-medium hover:bg-orange-200 transition-colors"
+                          >
+                            📷 Handover to Courier
+                          </button>
+                        ) : (
+                          <div className="flex gap-2">
+                            <div className="bg-green-100 text-green-800 px-3 py-2 rounded-md text-sm font-medium">
+                              ✅ Handover Verified
+                            </div>
+                            <button 
+                              onClick={() => handleStatusUpdate(order._id, "in_transit", order.trackingNumber)}
+                              disabled={updatingOrderId === order._id}
+                              className="bg-indigo-100 text-indigo-800 px-3 py-2 rounded-md text-sm font-medium hover:bg-indigo-200 transition-colors disabled:opacity-50"
+                            >
+                              {updatingOrderId === order._id ? "Updating..." : "Delivery in Progress"}
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     )}
                     
                     {order.status === "in_transit" && (
@@ -337,6 +434,30 @@ export default function StaffOrders({ loaderData }: any) {
           })}
         </div>
       </div>
+      
+      {/* Arrival Capture Modal */}
+      {arrivalCaptureOrderId && (
+        <ArrivalCapture
+          orderId={arrivalCaptureOrderId}
+          onComplete={() => {
+            setArrivalCaptureOrderId(null);
+            // Optionally refresh orders or show success message
+          }}
+          onCancel={() => setArrivalCaptureOrderId(null)}
+        />
+      )}
+      
+      {/* Handover Capture Modal */}
+      {handoverCaptureOrderId && (
+        <HandoverCapture
+          orderId={handoverCaptureOrderId}
+          onComplete={() => {
+            setHandoverCaptureOrderId(null);
+            // Optionally refresh orders or show success message
+          }}
+          onCancel={() => setHandoverCaptureOrderId(null)}
+        />
+      )}
     </div>
   );
 }

@@ -703,6 +703,123 @@ export default defineSchema({
     .index("by_continent", ["continent"])
     .index("by_active", ["isActive"]),
 
+  // Parcel condition verification system
+  parcelConditions: defineTable({
+    orderId: v.string(), // Links to orders table
+    eventType: v.union(v.literal("arrival"), v.literal("handover")), // Two capture events
+    
+    // Dual photo storage (FRONT + SIDE)
+    frontPhotoStorageId: v.string(), // Convex file storage ID for front photo
+    sidePhotoStorageId: v.string(), // Convex file storage ID for side photo
+    
+    // Photo quality analysis
+    photoAnalysis: v.object({
+      frontPhoto: v.object({
+        blurScore: v.number(), // 0-100, higher = sharper
+        exposureScore: v.number(), // 0-100, higher = better exposure
+        hasScaleReference: v.boolean(), // Ruler detected in frame
+        rulerDetectionConfidence: v.number(), // 0-1 confidence score
+      }),
+      sidePhoto: v.object({
+        blurScore: v.number(), // 0-100, higher = sharper
+        exposureScore: v.number(), // 0-100, higher = better exposure
+      }),
+    }),
+    
+    // Manual damage assessment (no AI needed)
+    damageDetection: v.object({
+      manualAssessment: v.boolean(), // Always true - staff does the assessment
+      flaggedForReview: v.boolean(), // Staff or manager flagged
+      processingTimeMs: v.optional(v.number()),
+      analysisDate: v.number(),
+    }),
+    
+    // OpenCV dimension calculation
+    dimensionCalculation: v.object({
+      detectedRuler: v.object({
+        pixelsPerMm: v.number(), // Calculated scale factor
+        rulerCorners: v.array(v.object({
+          x: v.number(),
+          y: v.number(),
+        })), // 4 corners of detected ruler
+        perspectiveCorrected: v.boolean(),
+      }),
+      calculatedDimensions: v.object({
+        length_mm: v.number(),
+        width_mm: v.number(),
+        height_mm: v.number(),
+        dim_weight: v.number(), // Dimensional weight (L×W×H / 5000)
+        confidence: v.number(), // 0-1 measurement confidence
+      }),
+      processingTimeMs: v.optional(v.number()),
+    }),
+    
+    // Human-confirmed final assessment
+    finalDamageAssessment: v.union(
+      v.literal("none"), 
+      v.literal("minor"), 
+      v.literal("major")
+    ),
+    damageNotes: v.optional(v.string()), // Staff notes about damage
+    confirmedDamageTags: v.optional(v.array(v.string())), // Final confirmed damage types
+    
+    actualWeight: v.number(), // kg - manually entered by staff
+    
+    // Change detection (handover events only)
+    comparisonResult: v.optional(v.object({
+      arrivalConditionId: v.string(), // Reference to arrival event
+      alignmentScore: v.number(), // 0-1 image alignment quality
+      changeDetected: v.boolean(),
+      differenceMask: v.optional(v.string()), // Encoded difference image
+      lightingAdjusted: v.boolean(), // Whether lighting normalization was applied
+      ssimScore: v.number(), // Structural similarity index
+      changedAreas: v.optional(v.array(v.object({
+        area: v.string(), // "top-left", "center", etc.
+        changeType: v.string(), // "new_damage", "shadow_change", "position_shift"
+        confidence: v.number(),
+      }))),
+    })),
+    
+    // Verification workflow for handover
+    handoverDetails: v.optional(v.object({
+      courierName: v.string(),
+      courierRepresentative: v.optional(v.string()),
+      statusChange: v.union(
+        v.literal("no_change"), 
+        v.literal("new_damage"), 
+        v.literal("condition_improved")
+      ),
+      handoverNotes: v.optional(v.string()),
+      verificationSignature: v.optional(v.string()), // Digital signature or staff confirmation
+    })),
+    
+    // Tracking and audit
+    staffId: v.string(), // Who captured this condition record
+    staffName: v.string(), // Cache staff name for display
+    warehouseId: v.string(), // Where this was captured
+    deviceInfo: v.optional(v.string()), // Camera/device used
+    gpsLocation: v.optional(v.object({
+      latitude: v.number(),
+      longitude: v.number(),
+    })),
+    
+    // Status and review
+    requiresReview: v.boolean(), // Flagged for management review
+    reviewedBy: v.optional(v.string()), // Staff ID who reviewed
+    reviewedAt: v.optional(v.number()),
+    reviewNotes: v.optional(v.string()),
+    
+    timestamp: v.number(),
+    createdAt: v.number(),
+  }).index("by_order", ["orderId"])
+    .index("by_event_type", ["eventType"])
+    .index("by_staff", ["staffId"])
+    .index("by_warehouse", ["warehouseId"])
+    .index("by_order_event", ["orderId", "eventType"])
+    .index("by_requires_review", ["requiresReview"])
+    .index("by_timestamp", ["timestamp"])
+    .index("by_damage_assessment", ["finalDamageAssessment"]),
+
   // Keep existing tables (commented for now)
   subscriptions: defineTable({
     userId: v.optional(v.string()),

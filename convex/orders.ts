@@ -1,6 +1,14 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 
+// Get a single order by ID
+export const getOrder = query({
+  args: { orderId: v.string() },
+  handler: async (ctx, { orderId }) => {
+    return await ctx.db.get(orderId as any);
+  },
+});
+
 // Get orders for a forwarder with filtering and pagination
 export const getForwarderOrders = query({
   args: { 
@@ -476,5 +484,50 @@ export const getOrdersForForwarder = query({
       .take(limit);
 
     return orders;
+  },
+});
+
+// Delete an order and its related data
+export const deleteOrder = mutation({
+  args: { 
+    orderId: v.string(),
+    forwarderId: v.string(), // For permission check
+  },
+  handler: async (ctx, { orderId, forwarderId }) => {
+    // First, get the order to verify ownership
+    const order = await ctx.db.get(orderId as any);
+    
+    if (!order) {
+      throw new Error("Order not found");
+    }
+    
+    if (order.forwarderId !== forwarderId) {
+      throw new Error("Unauthorized: Order does not belong to this forwarder");
+    }
+    
+    // Delete related parcel conditions
+    const parcelConditions = await ctx.db
+      .query("parcelConditions")
+      .filter((q) => q.eq(q.field("orderId"), orderId))
+      .collect();
+    
+    for (const condition of parcelConditions) {
+      await ctx.db.delete(condition._id);
+    }
+    
+    // Delete order history
+    const orderHistory = await ctx.db
+      .query("orderHistory")
+      .filter((q) => q.eq(q.field("orderId"), orderId))
+      .collect();
+    
+    for (const history of orderHistory) {
+      await ctx.db.delete(history._id);
+    }
+    
+    // Finally, delete the order itself
+    await ctx.db.delete(orderId as any);
+    
+    return { success: true };
   },
 });

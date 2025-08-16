@@ -23,10 +23,15 @@ export default function ManageOrders({ loaderData }: Route.ComponentProps) {
   const forwarderData = useQuery(api.warehouseServiceAreas.getForwarderServiceAreas);
   
   const [isCreating, setIsCreating] = useState(false);
+  const [deletingOrderId, setDeletingOrderId] = useState<string | null>(null);
   const createOrder = useMutation(api.orders.createOrder);
   const updateOrderStatus = useMutation(api.orders.updateOrderStatus);
-  const splitOrderToWarehouse = useMutation(api.orders.splitOrderToWarehouse);
+  const deleteOrder = useMutation(api.orders.deleteOrder);
   
+  const forwarder = forwarderData?.forwarder;
+  const warehouses = forwarderData?.warehouses || [];
+  const firstWarehouse = warehouses[0] || null;
+
   // Get ALL orders for this forwarder using the same query as dashboard
   const allOrders = useQuery(
     api.orders.getRecentOrders,
@@ -36,9 +41,24 @@ export default function ManageOrders({ loaderData }: Route.ComponentProps) {
     } : "skip"
   );
 
-  const forwarder = forwarderData?.forwarder;
-  const warehouses = forwarderData?.warehouses || [];
-  const firstWarehouse = warehouses[0] || null;
+  // Get parcel conditions for verification status checking
+  const allConditions = useQuery(
+    api.parcelConditions.getConditionsRequiringReview,
+    { warehouseId: firstWarehouse?._id }
+  );
+
+  // Helper functions to check verification status
+  const hasArrivalVerification = (orderId: string) => {
+    return allConditions?.some(condition => 
+      condition.orderId === orderId && condition.eventType === "arrival"
+    );
+  };
+
+  const hasHandoverVerification = (orderId: string) => {
+    return allConditions?.some(condition => 
+      condition.orderId === orderId && condition.eventType === "handover"
+    );
+  };
   
   // Convert to expected format and add warehouse details
   const orderData = allOrders ? {
@@ -79,10 +99,6 @@ export default function ManageOrders({ loaderData }: Route.ComponentProps) {
   const [viewAll, setViewAll] = useState(false);
   
   // Split order states
-  const [splitModalOpen, setSplitModalOpen] = useState(false);
-  const [splitOrderId, setSplitOrderId] = useState<string | null>(null);
-  const [splitItems, setSplitItems] = useState([{ description: "", quantity: 1, weight: 0, value: 0 }]);
-  const [splitTargetWarehouse, setSplitTargetWarehouse] = useState("");
   
   // Shipping modal states
   const [shippingModalOpen, setShippingModalOpen] = useState(false);
@@ -178,6 +194,34 @@ export default function ManageOrders({ loaderData }: Route.ComponentProps) {
     alert(`Shipping label created! Tracking: ${result.trackingNumber}`);
     // Refresh orders list
     window.location.reload();
+  };
+
+  const handleDeleteOrder = async (orderId: string) => {
+    if (!forwarder) return;
+    
+    // Confirm deletion
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this order? This action cannot be undone and will remove all related data including photos and history."
+    );
+    
+    if (!confirmed) return;
+    
+    setDeletingOrderId(orderId);
+    
+    try {
+      await deleteOrder({
+        orderId: orderId,
+        forwarderId: forwarder._id,
+      });
+      
+      // Refresh to show updated list
+      window.location.reload();
+    } catch (error) {
+      console.error("Error deleting order:", error);
+      alert(`Failed to delete order: ${error.message}`);
+    } finally {
+      setDeletingOrderId(null);
+    }
   };
 
   // Filter and sort orders
@@ -293,36 +337,6 @@ export default function ManageOrders({ loaderData }: Route.ComponentProps) {
   };
 
   // Handle split order
-  const handleSplitOrder = async () => {
-    if (!splitOrderId || !splitTargetWarehouse || !forwarder) return;
-
-    try {
-      await splitOrderToWarehouse({
-        orderId: splitOrderId,
-        targetWarehouseId: splitTargetWarehouse,
-        items: splitItems,
-        updatedBy: forwarder._id,
-        notes: "Order split via dashboard",
-      });
-
-      // Close modal and reset state
-      setSplitModalOpen(false);
-      setSplitOrderId(null);
-      setSplitItems([{ description: "", quantity: 1, weight: 0, value: 0 }]);
-      setSplitTargetWarehouse("");
-      
-      // Refresh page
-      window.location.reload();
-    } catch (error) {
-      console.error("Error splitting order:", error);
-      alert("Failed to split order");
-    }
-  };
-
-  const openSplitModal = (orderId: string) => {
-    setSplitOrderId(orderId);
-    setSplitModalOpen(true);
-  };
 
   // Get unique couriers for filter dropdown
   const availableCouriers = [...new Set(orderData?.orders?.filter(order => order.courier).map(order => order.courier) || [])];
@@ -534,7 +548,12 @@ export default function ManageOrders({ loaderData }: Route.ComponentProps) {
       <div className="bg-card border border-border rounded-xl">
         <div className="p-6 border-b border-border">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-foreground">Orders</h2>
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">Orders</h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                📷 Photo verification is performed by warehouse staff on arrival and handover
+              </p>
+            </div>
             <div className="flex items-center gap-4 text-sm text-muted-foreground">
               <span>
                 Showing: <span className="font-medium text-foreground">{paginatedOrders.length}</span>
@@ -558,6 +577,7 @@ export default function ManageOrders({ loaderData }: Route.ComponentProps) {
                 <th className="text-left p-4 text-sm font-medium text-muted-foreground">Warehouse</th>
                 <th className="text-left p-4 text-sm font-medium text-muted-foreground">Shipping Type</th>
                 <th className="text-left p-4 text-sm font-medium text-muted-foreground">Status</th>
+                <th className="text-left p-4 text-sm font-medium text-muted-foreground">Verification</th>
                 <th className="text-left p-4 text-sm font-medium text-muted-foreground">Courier</th>
                 <th className="text-left p-4 text-sm font-medium text-muted-foreground">Actions</th>
               </tr>
@@ -631,18 +651,59 @@ export default function ManageOrders({ loaderData }: Route.ComponentProps) {
                         <option value="delivered">Arrived at Destination</option>
                       </select>
                     </td>
+                    <td className="p-4">
+                      <div className="flex flex-col gap-1">
+                        {/* Show verification status based on order status */}
+                        {order.status === "arrived_at_warehouse" && (
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            hasArrivalVerification(order._id) 
+                              ? 'bg-green-100 text-green-800' 
+                              : 'bg-red-100 text-red-800'
+                          }`}>
+                            {hasArrivalVerification(order._id) ? '✅ Arrival Verified' : '📷 Arrival Needed'}
+                          </span>
+                        )}
+                        {order.status === "awaiting_pickup" && (
+                          <div className="flex flex-col gap-1">
+                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                              ✅ Arrival Verified
+                            </span>
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              hasHandoverVerification(order._id) 
+                                ? 'bg-green-100 text-green-800' 
+                                : 'bg-orange-100 text-orange-800'
+                            }`}>
+                              {hasHandoverVerification(order._id) ? '✅ Handover Verified' : '📷 Handover Needed'}
+                            </span>
+                          </div>
+                        )}
+                        {["packed", "in_transit", "delivered"].includes(order.status) && (
+                          <div className="flex flex-col gap-1">
+                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                              ✅ All Verified
+                            </span>
+                          </div>
+                        )}
+                        {order.status === "incoming" && (
+                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                            - Awaiting Arrival
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td className="p-4 text-sm text-muted-foreground">
                       {order.courier || 'Not assigned'}
                     </td>
                     <td className="p-4">
                       <div className="flex items-center gap-2">
-                        {/* Split Order Button */}
+                        {/* Delete Order Button */}
                         <button
-                          onClick={() => openSplitModal(order._id)}
-                          className="bg-secondary text-secondary-foreground px-3 py-1 rounded-md text-sm font-medium hover:bg-secondary/90 transition-colors"
-                          title="Split this order to different warehouse"
+                          onClick={() => handleDeleteOrder(order._id)}
+                          disabled={deletingOrderId === order._id}
+                          className="bg-red-100 text-red-800 px-3 py-1 rounded-md text-sm font-medium hover:bg-red-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="Delete this order permanently"
                         >
-                          Split
+                          {deletingOrderId === order._id ? "..." : "🗑"}
                         </button>
                         
                         {/* Smart Actions based on order state - Customer pre-assigns courier */}
@@ -764,135 +825,6 @@ export default function ManageOrders({ loaderData }: Route.ComponentProps) {
         </div>
       </div>
 
-      {/* Split Order Modal */}
-      {splitModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold text-gray-900">Split Order</h2>
-                <button
-                  onClick={() => {
-                    setSplitModalOpen(false);
-                    setSplitOrderId(null);
-                    setSplitItems([{ description: "", quantity: 1, weight: 0, value: 0 }]);
-                    setSplitTargetWarehouse("");
-                  }}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  ×
-                </button>
-              </div>
-            </div>
-
-            <div className="px-6 py-4 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Target Warehouse
-                </label>
-                <select
-                  value={splitTargetWarehouse}
-                  onChange={(e) => setSplitTargetWarehouse(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="">Select warehouse...</option>
-                  {warehouses.map(warehouse => (
-                    <option key={warehouse._id} value={warehouse._id}>
-                      {warehouse.name} ({warehouse.city})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Items to Split
-                </label>
-                {splitItems.map((item, index) => (
-                  <div key={index} className="grid grid-cols-4 gap-3 mb-3">
-                    <input
-                      type="text"
-                      placeholder="Item description"
-                      value={item.description}
-                      onChange={(e) => {
-                        const newItems = [...splitItems];
-                        newItems[index].description = e.target.value;
-                        setSplitItems(newItems);
-                      }}
-                      className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                    <input
-                      type="number"
-                      placeholder="Qty"
-                      min="1"
-                      value={item.quantity}
-                      onChange={(e) => {
-                        const newItems = [...splitItems];
-                        newItems[index].quantity = Number(e.target.value);
-                        setSplitItems(newItems);
-                      }}
-                      className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                    <input
-                      type="number"
-                      placeholder="Weight (kg)"
-                      min="0"
-                      step="0.1"
-                      value={item.weight}
-                      onChange={(e) => {
-                        const newItems = [...splitItems];
-                        newItems[index].weight = Number(e.target.value);
-                        setSplitItems(newItems);
-                      }}
-                      className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                    <input
-                      type="number"
-                      placeholder="Value ($)"
-                      min="0"
-                      step="0.01"
-                      value={item.value}
-                      onChange={(e) => {
-                        const newItems = [...splitItems];
-                        newItems[index].value = Number(e.target.value);
-                        setSplitItems(newItems);
-                      }}
-                      className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
-                ))}
-                <button
-                  onClick={() => setSplitItems([...splitItems, { description: "", quantity: 1, weight: 0, value: 0 }])}
-                  className="text-sm text-blue-600 hover:text-blue-800"
-                >
-                  + Add Item
-                </button>
-              </div>
-            </div>
-
-            <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
-              <button
-                onClick={() => {
-                  setSplitModalOpen(false);
-                  setSplitOrderId(null);
-                  setSplitItems([{ description: "", quantity: 1, weight: 0, value: 0 }]);
-                  setSplitTargetWarehouse("");
-                }}
-                className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-medium transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSplitOrder}
-                disabled={!splitTargetWarehouse || splitItems.length === 0}
-                className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg font-medium transition-colors"
-              >
-                Split Order
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Shipping Rates Modal */}
       {shippingModalOpen && selectedOrderId && forwarder && (
