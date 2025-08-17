@@ -5,6 +5,7 @@ import { api } from "../../../convex/_generated/api";
 import { MapPin, Plus, Edit, Trash2, Globe, Clock, DollarSign, AlertCircle, Save, X } from "lucide-react";
 import { getAllCountries, getStatesForCountry, basicAddressShape, getCountryCode } from "../../utils/addressValidation";
 import WarehouseOperatingHours from "../../components/warehouse/WarehouseOperatingHours";
+import AddressAutocomplete from "../../components/ui/AddressAutocomplete";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -37,6 +38,52 @@ export default function ForwarderServiceAreasPage() {
   
   // Validation state
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  
+  // Google autocomplete state
+  const [useGoogleAutocomplete, setUseGoogleAutocomplete] = useState(true);
+  const [useGoogleAutocompleteEdit, setUseGoogleAutocompleteEdit] = useState(true);
+
+  // Handle Google Places address selection for new warehouse
+  const handleGoogleAddressSelectNew = (addressData: {
+    address: string;
+    city: string;
+    state: string;
+    country: string;
+    postalCode: string;
+  }) => {
+    const countryCode = getCountryCode(addressData.country) || addressData.country;
+    setNewWarehouse(prev => ({
+      ...prev,
+      address: addressData.address,
+      city: addressData.city,
+      state: addressData.state,
+      stateCode: addressData.state,
+      country: addressData.country,
+      countryCode: countryCode,
+      postalCode: addressData.postalCode,
+    }));
+  };
+
+  // Handle Google Places address selection for editing warehouse
+  const handleGoogleAddressSelectEdit = (addressData: {
+    address: string;
+    city: string;
+    state: string;
+    country: string;
+    postalCode: string;
+  }) => {
+    const countryCode = getCountryCode(addressData.country) || addressData.country;
+    setEditingWarehouseData(prev => ({
+      ...prev,
+      address: addressData.address,
+      city: addressData.city,
+      state: addressData.state,
+      stateCode: addressData.state,
+      country: addressData.country,
+      countryCode: countryCode,
+      postalCode: addressData.postalCode,
+    }));
+  };
 
   // Get forwarder data with warehouses and service areas
   const forwarderData = useQuery(api.warehouseServiceAreas.getForwarderServiceAreas);
@@ -522,19 +569,68 @@ export default function ForwarderServiceAreasPage() {
                 </div>
               </div>
 
+              {/* Address Input Method Toggle */}
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h4 className="font-medium text-gray-900">Address Input Method</h4>
+                  <p className="text-sm text-gray-600">Choose how you'd like to enter the warehouse address</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setUseGoogleAutocomplete(true)}
+                    className={`px-3 py-1 text-xs rounded-md transition-colors ${
+                      useGoogleAutocomplete 
+                        ? 'bg-blue-600 text-white' 
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    }`}
+                  >
+                    🔍 Smart Search
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setUseGoogleAutocomplete(false)}
+                    className={`px-3 py-1 text-xs rounded-md transition-colors ${
+                      !useGoogleAutocomplete 
+                        ? 'bg-blue-600 text-white' 
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    }`}
+                  >
+                    ✏️ Manual Entry
+                  </button>
+                </div>
+              </div>
+
               {/* Address Details */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Street Address *
-                  </label>
-                  <input
-                    type="text"
-                    value={newWarehouse.address}
-                    onChange={(e) => setNewWarehouse({...newWarehouse, address: e.target.value})}
-                    placeholder="123 Rue de la Paix"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
+                  {useGoogleAutocomplete ? (
+                    // Google Places Autocomplete
+                    <AddressAutocomplete
+                      label="Street Address"
+                      placeholder="Start typing warehouse address (e.g., 123 Industrial Drive)"
+                      value={newWarehouse.address}
+                      onChange={(value) => setNewWarehouse({...newWarehouse, address: value})}
+                      onAddressSelect={handleGoogleAddressSelectNew}
+                      countryBias={newWarehouse.countryCode && newWarehouse.countryCode !== '' ? newWarehouse.countryCode : undefined}
+                      required
+                      className="w-full"
+                    />
+                  ) : (
+                    // Manual address input
+                    <>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Street Address *
+                      </label>
+                      <input
+                        type="text"
+                        value={newWarehouse.address}
+                        onChange={(e) => setNewWarehouse({...newWarehouse, address: e.target.value})}
+                        placeholder="123 Rue de la Paix"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                    </>
+                  )}
                 </div>
 
                 <div>
@@ -710,16 +806,64 @@ export default function ForwarderServiceAreasPage() {
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Street Address</label>
-                    <input
-                      type="text"
-                      value={editingWarehouseData.address}
-                      onChange={(e) => setEditingWarehouseData({
-                        ...editingWarehouseData,
-                        address: e.target.value
-                      })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
+                    {/* Address Input Method Toggle for Edit */}
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-sm font-medium text-gray-700">Address Input Method</span>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setUseGoogleAutocompleteEdit(true)}
+                          className={`px-2 py-1 text-xs rounded transition-colors ${
+                            useGoogleAutocompleteEdit 
+                              ? 'bg-blue-600 text-white' 
+                              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                          }`}
+                        >
+                          🔍 Smart
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setUseGoogleAutocompleteEdit(false)}
+                          className={`px-2 py-1 text-xs rounded transition-colors ${
+                            !useGoogleAutocompleteEdit 
+                              ? 'bg-blue-600 text-white' 
+                              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                          }`}
+                        >
+                          ✏️ Manual
+                        </button>
+                      </div>
+                    </div>
+
+                    {useGoogleAutocompleteEdit ? (
+                      // Google Places Autocomplete for edit
+                      <AddressAutocomplete
+                        label="Street Address"
+                        placeholder="Start typing warehouse address"
+                        value={editingWarehouseData.address}
+                        onChange={(value) => setEditingWarehouseData({
+                          ...editingWarehouseData,
+                          address: value
+                        })}
+                        onAddressSelect={handleGoogleAddressSelectEdit}
+                        countryBias={editingWarehouseData.countryCode && editingWarehouseData.countryCode !== '' ? editingWarehouseData.countryCode : undefined}
+                        className="w-full"
+                      />
+                    ) : (
+                      // Manual address input for edit
+                      <>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Street Address</label>
+                        <input
+                          type="text"
+                          value={editingWarehouseData.address}
+                          onChange={(e) => setEditingWarehouseData({
+                            ...editingWarehouseData,
+                            address: e.target.value
+                          })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        />
+                      </>
+                    )}
                   </div>
                   
                   <div>

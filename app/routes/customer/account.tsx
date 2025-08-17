@@ -12,8 +12,10 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Separator } from "~/components/ui/separator";
 import { Badge } from "~/components/ui/badge";
-import { UserCircle, Mail, Key, Shield, Bell, Trash2, Download, Eye, EyeOff, X, MapPin } from "lucide-react";
+import { UserCircle, Mail, Key, Shield, Bell, Trash2, Download, Eye, EyeOff, X, MapPin, AlertCircle, Info } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
+import { validateFullAddress, getAllCountries, getStatesForCountry, type AddressValidationResult } from "~/utils/addressValidation";
+import AddressAutocomplete from "~/components/ui/AddressAutocomplete";
 
 export async function loader(args: Route.LoaderArgs) {
   const { userId } = await getAuth(args);
@@ -35,6 +37,11 @@ export default function CustomerAccountSettings({ loaderData }: Route.ComponentP
   const updateProfile = useMutation(api.users.updateUserProfile);
   const updateNotifications = useMutation(api.users.updateNotificationSettings);
   const updatePrivacySettings = useMutation(api.users.updatePrivacySettings);
+  const addCustomerAddress = useMutation(api.customerDashboard.addCustomerAddress);
+  const updateCustomerAddress = useMutation(api.customerDashboard.updateCustomerAddress);
+  
+  // Get customer addresses
+  const customerAddresses = useQuery(api.customerDashboard.getCustomerAddresses);
   
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -63,6 +70,11 @@ export default function CustomerAccountSettings({ loaderData }: Route.ComponentP
     postalCode: "",
     country: ""
   });
+
+  const [addressValidation, setAddressValidation] = useState<AddressValidationResult | null>(null);
+  const [countries] = useState(() => getAllCountries());
+  const [states, setStates] = useState<Array<{ code: string; name: string }>>([]);
+  const [useGoogleAutocomplete, setUseGoogleAutocomplete] = useState(true);
 
   const [notificationSettings, setNotificationSettings] = useState({
     emailNotifications: true,
@@ -103,7 +115,7 @@ export default function CustomerAccountSettings({ loaderData }: Route.ComponentP
         orderStatusUpdates: userProfile?.notificationSettings?.orderStatusUpdates ?? true,
         marketingEmails: userProfile?.notificationSettings?.marketingEmails ?? false,
         securityAlerts: userProfile?.notificationSettings?.securityAlerts ?? true,
-        smsNotifications: false
+        smsNotifications: userProfile?.notificationSettings?.smsNotifications ?? false
       });
 
       setPrivacySettings({
@@ -113,6 +125,50 @@ export default function CustomerAccountSettings({ loaderData }: Route.ComponentP
       });
     }
   }, [userProfile, user]);
+  
+  // Load default address when addresses are available
+  React.useEffect(() => {
+    if (customerAddresses && customerAddresses.length > 0) {
+      const defaultAddress = customerAddresses.find(addr => addr.isDefault) || customerAddresses[0];
+      if (defaultAddress) {
+        setAddressData({
+          street: defaultAddress.address || "",
+          city: defaultAddress.city || "",
+          state: defaultAddress.state || "",
+          postalCode: defaultAddress.postalCode || "",
+          country: defaultAddress.country || ""
+        });
+      }
+    }
+  }, [customerAddresses]);
+  
+  // Update states when country changes
+  React.useEffect(() => {
+    if (addressData.country) {
+      const countryStates = getStatesForCountry(addressData.country);
+      setStates(countryStates);
+      // Clear state if new country doesn't have states or current state is invalid
+      if (countryStates.length === 0 || !countryStates.some(s => s.code === addressData.state)) {
+        setAddressData(prev => ({ ...prev, state: "" }));
+      }
+    }
+  }, [addressData.country]);
+
+  // Validate address when fields change
+  React.useEffect(() => {
+    if (addressData.street || addressData.city || addressData.postalCode || addressData.country) {
+      const validation = validateFullAddress({
+        countryA2: addressData.country,
+        state: addressData.state,
+        city: addressData.city,
+        line1: addressData.street,
+        postal: addressData.postalCode
+      });
+      setAddressValidation(validation);
+    } else {
+      setAddressValidation(null);
+    }
+  }, [addressData.street, addressData.city, addressData.state, addressData.country, addressData.postalCode]);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -120,6 +176,23 @@ export default function CustomerAccountSettings({ loaderData }: Route.ComponentP
 
   const handleAddressChange = (field: string, value: string) => {
     setAddressData(prev => ({ ...prev, [field]: value }));
+  };
+
+  // Handle Google Places address selection
+  const handleGoogleAddressSelect = (addressData: {
+    address: string;
+    city: string;
+    state: string;
+    country: string;
+    postalCode: string;
+  }) => {
+    setAddressData({
+      street: addressData.address,
+      city: addressData.city,
+      state: addressData.state,
+      country: addressData.country,
+      postalCode: addressData.postalCode,
+    });
   };
 
   const handleNotificationChange = (field: string, value: boolean) => {
@@ -222,6 +295,50 @@ export default function CustomerAccountSettings({ loaderData }: Route.ComponentP
     } catch (error: any) {
       console.error("Error updating privacy settings:", error);
       showNotification(`Failed to update privacy settings: ${error.message || error}`, 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleAddressSave = async () => {
+    // Validate address before saving
+    if (!addressValidation?.isValid) {
+      showNotification('Please fix address validation errors before saving', 'error');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const defaultAddress = customerAddresses?.find(addr => addr.isDefault);
+      
+      if (defaultAddress) {
+        // Update existing default address
+        await updateCustomerAddress({
+          addressId: defaultAddress._id,
+          address: addressData.street,
+          city: addressData.city,
+          state: addressData.state,
+          postalCode: addressData.postalCode,
+          country: addressData.country,
+        });
+      } else {
+        // Create new default address
+        await addCustomerAddress({
+          label: "Default Address",
+          recipientName: formData.firstName + " " + formData.lastName,
+          address: addressData.street,
+          city: addressData.city,
+          state: addressData.state,
+          country: addressData.country,
+          postalCode: addressData.postalCode,
+          isDefault: true,
+        });
+      }
+      
+      showNotification("Address updated successfully!");
+    } catch (error: any) {
+      console.error("Error updating address:", error);
+      showNotification(`Failed to update address: ${error.message || error}`, 'error');
     } finally {
       setIsLoading(false);
     }
@@ -373,42 +490,138 @@ export default function CustomerAccountSettings({ loaderData }: Route.ComponentP
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div>
-              <Label htmlFor="street">Street Address</Label>
-              <Input
-                id="street"
-                value={addressData.street}
-                onChange={(e) => handleAddressChange('street', e.target.value)}
-                placeholder="123 Main Street, Apt 4B"
-                className="mt-1"
-              />
+            {/* Toggle between Google and manual input */}
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h4 className="font-medium text-foreground">Address Input Method</h4>
+                <p className="text-sm text-muted-foreground">Choose how you'd like to enter your address</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setUseGoogleAutocomplete(true)}
+                  className={`px-3 py-1 text-xs rounded-md transition-colors ${
+                    useGoogleAutocomplete 
+                      ? 'bg-primary text-primary-foreground' 
+                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                  }`}
+                >
+                  🔍 Smart Search
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setUseGoogleAutocomplete(false)}
+                  className={`px-3 py-1 text-xs rounded-md transition-colors ${
+                    !useGoogleAutocomplete 
+                      ? 'bg-primary text-primary-foreground' 
+                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                  }`}
+                >
+                  ✏️ Manual Entry
+                </button>
+              </div>
             </div>
+
+            {useGoogleAutocomplete ? (
+              // Google Places Autocomplete
+              <AddressAutocomplete
+                label="Street Address"
+                placeholder="Start typing your address (e.g., 123 Main Street)"
+                value={addressData.street}
+                onChange={(value) => handleAddressChange('street', value)}
+                onAddressSelect={handleGoogleAddressSelect}
+                countryBias={addressData.country && addressData.country !== '' ? addressData.country : undefined}
+                required
+                error={addressValidation?.errors.some(e => e.includes('address') || e.includes('Street')) || false}
+              />
+            ) : (
+              // Manual address input
+              <div>
+                <Label htmlFor="street">Street Address</Label>
+                <Input
+                  id="street"
+                  value={addressData.street}
+                  onChange={(e) => handleAddressChange('street', e.target.value)}
+                  placeholder="123 Main Street, Apt 4B"
+                  className="mt-1"
+                />
+              </div>
+            )}
             
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="city">City</Label>
+                <Label htmlFor="city">City *</Label>
                 <Input
                   id="city"
                   value={addressData.city}
                   onChange={(e) => handleAddressChange('city', e.target.value)}
                   placeholder="Singapore"
-                  className="mt-1"
+                  className={`mt-1 ${addressValidation?.errors.some(e => e.includes('city') || e.includes('City')) ? 'border-red-500' : ''}`}
                 />
               </div>
               <div>
-                <Label htmlFor="postalCode">Postal Code</Label>
+                <Label htmlFor="country">Country *</Label>
+                <select
+                  id="country"
+                  value={addressData.country}
+                  onChange={(e) => handleAddressChange('country', e.target.value)}
+                  className="mt-1 w-full px-3 py-2 border border-input bg-background rounded-md text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                >
+                  <option value="">Select Country</option>
+                  {countries.map((country) => (
+                    <option key={country.code} value={country.code}>
+                      {country.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="state">
+                  State/Region{states.length > 0 ? ' *' : ''}
+                </Label>
+                {states.length > 0 ? (
+                  <select
+                    id="state"
+                    value={addressData.state}
+                    onChange={(e) => handleAddressChange('state', e.target.value)}
+                    className="mt-1 w-full px-3 py-2 border border-input bg-background rounded-md text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  >
+                    <option value="">Select State/Province</option>
+                    {states.map((state) => (
+                      <option key={state.code} value={state.code}>
+                        {state.name}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <Input
+                    id="state"
+                    placeholder="State/Region"
+                    value={addressData.state}
+                    onChange={(e) => handleAddressChange('state', e.target.value)}
+                    className="mt-1"
+                  />
+                )}
+              </div>
+              <div>
+                <Label htmlFor="postalCode">Postal Code *</Label>
                 <Input
                   id="postalCode"
                   value={addressData.postalCode}
                   onChange={(e) => handleAddressChange('postalCode', e.target.value)}
-                  placeholder="123456"
-                  className="mt-1"
+                  placeholder={addressData.country === 'SG' ? '123456' : 'Postal Code'}
+                  className={`mt-1 ${addressValidation?.errors.some(e => e.includes('postal')) ? 'border-red-500' : ''}`}
                 />
               </div>
             </div>
             
             <div className="flex gap-3">
-              <Button>Save Address</Button>
+              <Button onClick={handleAddressSave} disabled={isLoading}>
+                {isLoading ? "Saving..." : "Save Address"}
+              </Button>
               <Button variant="outline">Add New Address</Button>
             </div>
           </CardContent>

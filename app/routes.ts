@@ -22,6 +22,8 @@ export default [
   route("seed-data", "routes/seed-data.tsx"),
   // API routes
   route("api/webhooks/mailgun", "routes/api/webhooks/mailgun.ts"),
+  route("api/places/autocomplete", "routes/api/places/autocomplete.ts"),
+  route("api/places/details", "routes/api/places/details.ts"),
   layout("routes/dashboard/layout.tsx", [
     route("dashboard", "routes/dashboard/index.tsx"),
     route("dashboard/chat", "routes/dashboard/chat.tsx"),

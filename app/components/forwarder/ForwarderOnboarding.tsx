@@ -2,12 +2,14 @@
 
 import { useState, useEffect } from "react";
 import { useMutation } from "convex/react";
-import { CheckCircle, Building, MapPin, Phone, Mail, ArrowRight, ArrowLeft } from "lucide-react";
+import { CheckCircle, Building, MapPin, Phone, Mail, ArrowRight, ArrowLeft, AlertCircle, Info } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { api } from "../../../convex/_generated/api";
+import { validateFullAddress, getAllCountries, getStatesForCountry, type AddressValidationResult } from "~/utils/addressValidation";
+import AddressAutocomplete from "../ui/AddressAutocomplete";
 
 interface FormData {
   businessName: string;
@@ -71,6 +73,11 @@ export default function ForwarderOnboarding({ userId, onComplete }: ForwarderOnb
     maxParcels: 100,
     maxWeightKg: 30
   });
+
+  const [addressValidation, setAddressValidation] = useState<AddressValidationResult | null>(null);
+  const [countries] = useState(() => getAllCountries());
+  const [states, setStates] = useState<Array<{ code: string; name: string }>>([]);
+  const [useGoogleAutocomplete, setUseGoogleAutocomplete] = useState(true);
   
   // Auto-detect timezone on component mount and when location changes
   useEffect(() => {
@@ -83,6 +90,34 @@ export default function ForwarderOnboarding({ userId, onComplete }: ForwarderOnb
     }
   }, []);
   
+  // Update states when country changes
+  useEffect(() => {
+    if (formData.country) {
+      const countryStates = getStatesForCountry(formData.country);
+      setStates(countryStates);
+      // Clear state if new country doesn't have states or current state is invalid
+      if (countryStates.length === 0 || !countryStates.some(s => s.code === formData.state)) {
+        setFormData(prev => ({ ...prev, state: "" }));
+      }
+    }
+  }, [formData.country]);
+
+  // Validate address when relevant fields change
+  useEffect(() => {
+    if (formData.address || formData.city || formData.postalCode || formData.country) {
+      const validation = validateFullAddress({
+        countryA2: formData.country,
+        state: formData.state,
+        city: formData.city,
+        line1: formData.address,
+        postal: formData.postalCode
+      });
+      setAddressValidation(validation);
+    } else {
+      setAddressValidation(null);
+    }
+  }, [formData.address, formData.city, formData.state, formData.country, formData.postalCode]);
+
   // Update timezone when location changes
   useEffect(() => {
     if (formData.country) {
@@ -108,6 +143,24 @@ export default function ForwarderOnboarding({ userId, onComplete }: ForwarderOnb
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  // Handle Google Places address selection
+  const handleGoogleAddressSelect = (addressData: {
+    address: string;
+    city: string;
+    state: string;
+    country: string;
+    postalCode: string;
+  }) => {
+    setFormData(prev => ({
+      ...prev,
+      address: addressData.address,
+      city: addressData.city,
+      state: addressData.state,
+      country: addressData.country,
+      postalCode: addressData.postalCode,
+    }));
+  };
+
   const validateStep = (step: number): boolean => {
     switch (step) {
       case 1:
@@ -115,7 +168,8 @@ export default function ForwarderOnboarding({ userId, onComplete }: ForwarderOnb
       case 2:
         return formData.contactEmail.trim() !== "";
       case 3:
-        return formData.address.trim() !== "" && formData.city.trim() !== "";
+        // Require valid address for step 3
+        return addressValidation?.isValid === true;
       default:
         return true;
     }
@@ -305,17 +359,65 @@ export default function ForwarderOnboarding({ userId, onComplete }: ForwarderOnb
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                {/* Toggle between Google and manual input */}
+                <div className="flex items-center justify-between mb-4">
                   <div>
-                    <Label htmlFor="address">Address *</Label>
+                    <h4 className="font-medium text-foreground">Address Input Method</h4>
+                    <p className="text-sm text-muted-foreground">Choose how you'd like to enter your warehouse address</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setUseGoogleAutocomplete(true)}
+                      className={`px-3 py-1 text-xs rounded-md transition-colors ${
+                        useGoogleAutocomplete 
+                          ? 'bg-primary text-primary-foreground' 
+                          : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                      }`}
+                    >
+                      🔍 Smart Search
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setUseGoogleAutocomplete(false)}
+                      className={`px-3 py-1 text-xs rounded-md transition-colors ${
+                        !useGoogleAutocomplete 
+                          ? 'bg-primary text-primary-foreground' 
+                          : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                      }`}
+                    >
+                      ✏️ Manual Entry
+                    </button>
+                  </div>
+                </div>
+
+                {useGoogleAutocomplete ? (
+                  // Google Places Autocomplete
+                  <AddressAutocomplete
+                    label="Warehouse Address"
+                    placeholder="Start typing your warehouse address (e.g., 123 Industrial Drive)"
+                    value={formData.address}
+                    onChange={(value) => updateFormData('address', value)}
+                    onAddressSelect={handleGoogleAddressSelect}
+                    countryBias={formData.country && formData.country !== '' ? formData.country : undefined}
+                    required
+                    error={addressValidation?.errors.some(e => e.includes('address') || e.includes('Street')) || false}
+                  />
+                ) : (
+                  // Manual address input
+                  <div>
+                    <Label htmlFor="address">Warehouse Address *</Label>
                     <Input
                       id="address"
-                      placeholder="123 Warehouse Street"
+                      placeholder="123 Warehouse Street, Unit 5B"
                       value={formData.address}
                       onChange={(e) => updateFormData('address', e.target.value)}
                       className="mt-1"
                     />
                   </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="city">City *</Label>
                     <Input
@@ -323,43 +425,120 @@ export default function ForwarderOnboarding({ userId, onComplete }: ForwarderOnb
                       placeholder="Singapore"
                       value={formData.city}
                       onChange={(e) => updateFormData('city', e.target.value)}
-                      className="mt-1"
+                      className={`mt-1 ${addressValidation?.errors.some(e => e.includes('city') || e.includes('City')) ? 'border-red-500' : ''}`}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="country">Country *</Label>
+                    <select
+                      id="country"
+                      value={formData.country}
+                      onChange={(e) => updateFormData('country', e.target.value)}
+                      className="mt-1 w-full px-3 py-2 border border-input bg-background rounded-md text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    >
+                      <option value="">Select Country</option>
+                      {countries.map((country) => (
+                        <option key={country.code} value={country.code}>
+                          {country.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="state">
+                      State/Region{states.length > 0 ? ' *' : ''}
+                    </Label>
+                    {states.length > 0 ? (
+                      <select
+                        id="state"
+                        value={formData.state}
+                        onChange={(e) => updateFormData('state', e.target.value)}
+                        className="mt-1 w-full px-3 py-2 border border-input bg-background rounded-md text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      >
+                        <option value="">Select State/Province</option>
+                        {states.map((state) => (
+                          <option key={state.code} value={state.code}>
+                            {state.name}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <Input
+                        id="state"
+                        placeholder="State/Region"
+                        value={formData.state}
+                        onChange={(e) => updateFormData('state', e.target.value)}
+                        className="mt-1"
+                      />
+                    )}
+                  </div>
+                  <div>
+                    <Label htmlFor="postalCode">Postal Code *</Label>
+                    <Input
+                      id="postalCode"
+                      placeholder={formData.country === 'SG' ? '123456' : 'Postal Code'}
+                      value={formData.postalCode}
+                      onChange={(e) => updateFormData('postalCode', e.target.value)}
+                      className={`mt-1 ${addressValidation?.errors.some(e => e.includes('postal')) ? 'border-red-500' : ''}`}
                     />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <Label htmlFor="state">State/Region</Label>
-                    <Input
-                      id="state"
-                      placeholder="Central"
-                      value={formData.state}
-                      onChange={(e) => updateFormData('state', e.target.value)}
-                      className="mt-1"
-                    />
+                {/* Address Validation Feedback */}
+                {addressValidation && (
+                  <div className="space-y-2">
+                    {addressValidation.errors.length > 0 && (
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                        <div className="flex items-start gap-2">
+                          <AlertCircle className="w-4 h-4 text-red-600 mt-0.5 flex-shrink-0" />
+                          <div>
+                            <p className="text-sm font-medium text-red-800">Address Issues:</p>
+                            <ul className="text-sm text-red-700 mt-1 space-y-1">
+                              {addressValidation.errors.map((error, index) => (
+                                <li key={index}>• {error}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {addressValidation.warnings && addressValidation.warnings.length > 0 && (
+                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                        <div className="flex items-start gap-2">
+                          <Info className="w-4 h-4 text-yellow-600 mt-0.5 flex-shrink-0" />
+                          <div>
+                            <p className="text-sm font-medium text-yellow-800">Suggestions:</p>
+                            <ul className="text-sm text-yellow-700 mt-1 space-y-1">
+                              {addressValidation.warnings.map((warning, index) => (
+                                <li key={index}>• {warning}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {addressValidation.suggestions && addressValidation.suggestions.length > 0 && (
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                        <div className="flex items-start gap-2">
+                          <Info className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                          <div>
+                            <p className="text-sm font-medium text-blue-800">Format Help:</p>
+                            <ul className="text-sm text-blue-700 mt-1 space-y-1">
+                              {addressValidation.suggestions.map((suggestion, index) => (
+                                <li key={index}>• {suggestion}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <div>
-                    <Label htmlFor="country">Country</Label>
-                    <Input
-                      id="country"
-                      placeholder="Singapore"
-                      value={formData.country}
-                      onChange={(e) => updateFormData('country', e.target.value)}
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="postalCode">Postal Code</Label>
-                    <Input
-                      id="postalCode"
-                      placeholder="123456"
-                      value={formData.postalCode}
-                      onChange={(e) => updateFormData('postalCode', e.target.value)}
-                      className="mt-1"
-                    />
-                  </div>
-                </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
