@@ -1,7 +1,7 @@
 import type { ActionFunction } from "react-router";
 import { fetchMutation } from "convex/nextjs";
 import { api } from "../../../../convex/_generated/api";
-import { processEmail } from "../../../utils/email-processing";
+import { processEmailWithMatching } from "../../../utils/email-processing";
 import Mailgun from 'mailgun.js';
 import FormData from 'form-data';
 
@@ -9,7 +9,7 @@ import FormData from 'form-data';
 const mailgun = new Mailgun(FormData);
 const mg = mailgun.client({
   username: 'api',
-  key: '7d29e6854ae52d2440989bc849a37ed4-16bc1610-51644a0f',
+  key: process.env.MAILGUN_API_KEY || '',
   url: 'https://api.mailgun.net', // US region
 });
 
@@ -60,14 +60,31 @@ export const action: ActionFunction = async ({ request }) => {
       }
     }
 
-    // Process email content and attachments
-    const processingResult = await processEmail({
+    // Process email content and attachments with enhanced shop detection
+    const processingResult = await processEmailWithMatching({
       from,
       to,
       subject,
       body,
       attachments,
-    });
+    }, true); // Enable purchase matching attempt
+
+    // Process PDF attachments for shipping label data
+    let pdfShippingData = null;
+    for (const attachment of attachments) {
+      if (attachment.contentType === 'application/pdf') {
+        try {
+          const pdfResult = await processPDFAttachment(attachment.content);
+          if (pdfResult.shippingLabelData) {
+            pdfShippingData = pdfResult.shippingLabelData;
+            console.log("Extracted shipping label data from PDF:", pdfShippingData);
+            break; // Use first PDF with shipping data
+          }
+        } catch (error) {
+          console.error("Error processing PDF for shipping data:", error);
+        }
+      }
+    }
 
     console.log(`Email processing result:`, {
       isShippingEmail: processingResult.isShippingEmail,
@@ -132,6 +149,54 @@ export const action: ActionFunction = async ({ request }) => {
     });
 
     console.log(`Email stored with ID: ${emailId}`);
+
+    // Attempt purchase matching if shop name extraction failed
+    if (processingResult.shouldAttemptPurchaseMatching) {
+      try {
+        const matchResult = await fetchMutation(api.emailMatching.matchEmailToPurchase, {
+          emailId,
+          extractedOrderNumbers: processingResult.extractedData.orderNumbers,
+          extractedShopName: processingResult.extractedData.shopName,
+          customerEmail: to,
+          emailReceivedAt: Date.now(),
+        });
+
+        if (matchResult.success) {
+          console.log(`Successfully matched email to purchase: ${matchResult.shopName}`);
+        } else {
+          console.log(`No purchase match found for email from: ${from}`);
+        }
+      } catch (error) {
+        console.error("Error attempting purchase matching:", error);
+      }
+    }
+
+    // Try to create ASN (Advance Shipment Notice) for forwarders
+    try {
+      const asnResult = await fetchMutation(api.asn.tryCreateAsnFromEmail, {
+        emailId,
+        emailData: {
+          from,
+          to,
+          subject,
+          body,
+          attachments: uploadedAttachments,
+        },
+        extractedData: processingResult.extractedData,
+        pdfShippingData, // Pass PDF shipping label data if available
+      });
+
+      if (asnResult.success) {
+        console.log(`ASN created: ${asnResult.asnId} for forwarder: ${asnResult.forwarderId}`);
+      } else if (asnResult.missingAsnReviewId) {
+        console.log(`Missing ASN review created: ${asnResult.missingAsnReviewId}`);
+      } else {
+        console.log(`No ASN created: ${asnResult.reason}`);
+      }
+    } catch (error) {
+      console.error("Error creating ASN:", error);
+      // Don't fail the entire webhook if ASN creation fails
+    }
 
     // Forward email to customer's real email
     try {

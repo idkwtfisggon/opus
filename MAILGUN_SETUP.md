@@ -12,7 +12,7 @@
 - **Customer Dashboard**: Interface to generate email addresses and view shipping emails
 
 ### Your Mailgun Credentials
-- **API Key**: `7d29e6854ae52d2440989bc849a37ed4-16bc1610-51644a0f`
+- **API Key**: Set in environment variable `MAILGUN_API_KEY`
 - **Domain**: `sandbox66b2007e061f4536af04dca475932b61.mailgun.org`
 - **Region**: US
 
