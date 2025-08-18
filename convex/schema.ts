@@ -41,6 +41,7 @@ export default defineSchema({
       orderStatusUpdates: v.optional(v.boolean()),
       marketingEmails: v.optional(v.boolean()),
       securityAlerts: v.optional(v.boolean()),
+      smsNotifications: v.optional(v.boolean()),
     })),
     
     // Account status

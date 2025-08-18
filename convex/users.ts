@@ -233,6 +233,7 @@ export const updateNotificationSettings = mutation({
     orderStatusUpdates: v.optional(v.boolean()),
     marketingEmails: v.optional(v.boolean()),
     securityAlerts: v.optional(v.boolean()),
+    smsNotifications: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();

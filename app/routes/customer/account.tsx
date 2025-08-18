@@ -14,8 +14,6 @@ import { Separator } from "~/components/ui/separator";
 import { Badge } from "~/components/ui/badge";
 import { UserCircle, Mail, Key, Shield, Bell, Trash2, Download, Eye, EyeOff, X, MapPin, AlertCircle, Info } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
-import { validateFullAddress, getAllCountries, getStatesForCountry, type AddressValidationResult } from "~/utils/addressValidation";
-import AddressAutocomplete from "~/components/ui/AddressAutocomplete";
 
 export async function loader(args: Route.LoaderArgs) {
   const { userId } = await getAuth(args);
@@ -63,25 +61,15 @@ export default function CustomerAccountSettings({ loaderData }: Route.ComponentP
     confirmPassword: ""
   });
 
-  const [addressData, setAddressData] = useState({
-    street: "",
-    city: "",
-    state: "",
-    postalCode: "",
-    country: ""
-  });
-
-  const [addressValidation, setAddressValidation] = useState<AddressValidationResult | null>(null);
-  const [countries] = useState(() => getAllCountries());
-  const [states, setStates] = useState<Array<{ code: string; name: string }>>([]);
-  const [useGoogleAutocomplete, setUseGoogleAutocomplete] = useState(true);
 
   const [notificationSettings, setNotificationSettings] = useState({
     emailNotifications: true,
     orderStatusUpdates: true,
     marketingEmails: false,
     securityAlerts: true,
-    smsNotifications: false
+    smsNotifications: false,
+    pushNotifications: true,
+    weeklyReports: true
   });
 
   const [privacySettings, setPrivacySettings] = useState({
@@ -115,7 +103,9 @@ export default function CustomerAccountSettings({ loaderData }: Route.ComponentP
         orderStatusUpdates: userProfile?.notificationSettings?.orderStatusUpdates ?? true,
         marketingEmails: userProfile?.notificationSettings?.marketingEmails ?? false,
         securityAlerts: userProfile?.notificationSettings?.securityAlerts ?? true,
-        smsNotifications: userProfile?.notificationSettings?.smsNotifications ?? false
+        smsNotifications: userProfile?.notificationSettings?.smsNotifications ?? false,
+        pushNotifications: true, // Browser push notifications
+        weeklyReports: userProfile?.notificationSettings?.orderStatusUpdates ?? true
       });
 
       setPrivacySettings({
@@ -126,74 +116,11 @@ export default function CustomerAccountSettings({ loaderData }: Route.ComponentP
     }
   }, [userProfile, user]);
   
-  // Load default address when addresses are available
-  React.useEffect(() => {
-    if (customerAddresses && customerAddresses.length > 0) {
-      const defaultAddress = customerAddresses.find(addr => addr.isDefault) || customerAddresses[0];
-      if (defaultAddress) {
-        setAddressData({
-          street: defaultAddress.address || "",
-          city: defaultAddress.city || "",
-          state: defaultAddress.state || "",
-          postalCode: defaultAddress.postalCode || "",
-          country: defaultAddress.country || ""
-        });
-      }
-    }
-  }, [customerAddresses]);
-  
-  // Update states when country changes
-  React.useEffect(() => {
-    if (addressData.country) {
-      const countryStates = getStatesForCountry(addressData.country);
-      setStates(countryStates);
-      // Clear state if new country doesn't have states or current state is invalid
-      if (countryStates.length === 0 || !countryStates.some(s => s.code === addressData.state)) {
-        setAddressData(prev => ({ ...prev, state: "" }));
-      }
-    }
-  }, [addressData.country]);
-
-  // Validate address when fields change
-  React.useEffect(() => {
-    if (addressData.street || addressData.city || addressData.postalCode || addressData.country) {
-      const validation = validateFullAddress({
-        countryA2: addressData.country,
-        state: addressData.state,
-        city: addressData.city,
-        line1: addressData.street,
-        postal: addressData.postalCode
-      });
-      setAddressValidation(validation);
-    } else {
-      setAddressValidation(null);
-    }
-  }, [addressData.street, addressData.city, addressData.state, addressData.country, addressData.postalCode]);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleAddressChange = (field: string, value: string) => {
-    setAddressData(prev => ({ ...prev, [field]: value }));
-  };
-
-  // Handle Google Places address selection
-  const handleGoogleAddressSelect = (addressData: {
-    address: string;
-    city: string;
-    state: string;
-    country: string;
-    postalCode: string;
-  }) => {
-    setAddressData({
-      street: addressData.address,
-      city: addressData.city,
-      state: addressData.state,
-      country: addressData.country,
-      postalCode: addressData.postalCode,
-    });
-  };
 
   const handleNotificationChange = (field: string, value: boolean) => {
     setNotificationSettings(prev => ({ ...prev, [field]: value }));
@@ -227,7 +154,13 @@ export default function CustomerAccountSettings({ loaderData }: Route.ComponentP
   const handleNotificationsSave = async () => {
     setIsLoading(true);
     try {
-      await updateNotifications(notificationSettings);
+      await updateNotifications({
+        emailNotifications: notificationSettings.emailNotifications,
+        orderStatusUpdates: notificationSettings.orderStatusUpdates,
+        marketingEmails: notificationSettings.marketingEmails,
+        securityAlerts: notificationSettings.securityAlerts,
+        smsNotifications: notificationSettings.smsNotifications
+      });
       showNotification("Notification preferences updated successfully!");
     } catch (error: any) {
       console.error("Error updating notifications:", error);
@@ -300,49 +233,6 @@ export default function CustomerAccountSettings({ loaderData }: Route.ComponentP
     }
   };
 
-  const handleAddressSave = async () => {
-    // Validate address before saving
-    if (!addressValidation?.isValid) {
-      showNotification('Please fix address validation errors before saving', 'error');
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      const defaultAddress = customerAddresses?.find(addr => addr.isDefault);
-      
-      if (defaultAddress) {
-        // Update existing default address
-        await updateCustomerAddress({
-          addressId: defaultAddress._id,
-          address: addressData.street,
-          city: addressData.city,
-          state: addressData.state,
-          postalCode: addressData.postalCode,
-          country: addressData.country,
-        });
-      } else {
-        // Create new default address
-        await addCustomerAddress({
-          label: "Default Address",
-          recipientName: formData.firstName + " " + formData.lastName,
-          address: addressData.street,
-          city: addressData.city,
-          state: addressData.state,
-          country: addressData.country,
-          postalCode: addressData.postalCode,
-          isDefault: true,
-        });
-      }
-      
-      showNotification("Address updated successfully!");
-    } catch (error: any) {
-      console.error("Error updating address:", error);
-      showNotification(`Failed to update address: ${error.message || error}`, 'error');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   return (
     <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
@@ -478,152 +368,51 @@ export default function CustomerAccountSettings({ loaderData }: Route.ComponentP
           </Card>
         </div>
 
-        {/* Shipping Address */}
+        {/* Address Management - Quick Link to Settings */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <MapPin className="w-5 h-5" />
-              Default Shipping Address
+              Address Management
             </CardTitle>
             <CardDescription>
-              Your default address for package delivery
+              Manage your shipping addresses and delivery preferences
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Toggle between Google and manual input */}
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h4 className="font-medium text-foreground">Address Input Method</h4>
-                <p className="text-sm text-muted-foreground">Choose how you'd like to enter your address</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setUseGoogleAutocomplete(true)}
-                  className={`px-3 py-1 text-xs rounded-md transition-colors ${
-                    useGoogleAutocomplete 
-                      ? 'bg-primary text-primary-foreground' 
-                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                  }`}
-                >
-                  🔍 Smart Search
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setUseGoogleAutocomplete(false)}
-                  className={`px-3 py-1 text-xs rounded-md transition-colors ${
-                    !useGoogleAutocomplete 
-                      ? 'bg-primary text-primary-foreground' 
-                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                  }`}
-                >
-                  ✏️ Manual Entry
-                </button>
-              </div>
-            </div>
-
-            {useGoogleAutocomplete ? (
-              // Google Places Autocomplete
-              <AddressAutocomplete
-                label="Street Address"
-                placeholder="Start typing your address (e.g., 123 Main Street)"
-                value={addressData.street}
-                onChange={(value) => handleAddressChange('street', value)}
-                onAddressSelect={handleGoogleAddressSelect}
-                countryBias={addressData.country && addressData.country !== '' ? addressData.country : undefined}
-                required
-                error={addressValidation?.errors.some(e => e.includes('address') || e.includes('Street')) || false}
-              />
-            ) : (
-              // Manual address input
-              <div>
-                <Label htmlFor="street">Street Address</Label>
-                <Input
-                  id="street"
-                  value={addressData.street}
-                  onChange={(e) => handleAddressChange('street', e.target.value)}
-                  placeholder="123 Main Street, Apt 4B"
-                  className="mt-1"
-                />
-              </div>
-            )}
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="city">City *</Label>
-                <Input
-                  id="city"
-                  value={addressData.city}
-                  onChange={(e) => handleAddressChange('city', e.target.value)}
-                  placeholder="Singapore"
-                  className={`mt-1 ${addressValidation?.errors.some(e => e.includes('city') || e.includes('City')) ? 'border-red-500' : ''}`}
-                />
-              </div>
-              <div>
-                <Label htmlFor="country">Country *</Label>
-                <select
-                  id="country"
-                  value={addressData.country}
-                  onChange={(e) => handleAddressChange('country', e.target.value)}
-                  className="mt-1 w-full px-3 py-2 border border-input bg-background rounded-md text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                >
-                  <option value="">Select Country</option>
-                  {countries.map((country) => (
-                    <option key={country.code} value={country.code}>
-                      {country.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <h4 className="font-medium text-blue-900 mb-2">📍 Address Book</h4>
+              <p className="text-sm text-blue-800 mb-3">
+                Your addresses have been moved to Settings for better organization. You can now manage multiple addresses, set defaults, and more.
+              </p>
+              <Button onClick={() => window.location.href = '/customer/settings'} className="bg-blue-600 hover:bg-blue-700">
+                Manage Addresses in Settings
+              </Button>
             </div>
             
-            <div className="grid grid-cols-2 gap-4">
+            {customerAddresses && customerAddresses.length > 0 && (
               <div>
-                <Label htmlFor="state">
-                  State/Region{states.length > 0 ? ' *' : ''}
-                </Label>
-                {states.length > 0 ? (
-                  <select
-                    id="state"
-                    value={addressData.state}
-                    onChange={(e) => handleAddressChange('state', e.target.value)}
-                    className="mt-1 w-full px-3 py-2 border border-input bg-background rounded-md text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                  >
-                    <option value="">Select State/Province</option>
-                    {states.map((state) => (
-                      <option key={state.code} value={state.code}>
-                        {state.name}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <Input
-                    id="state"
-                    placeholder="State/Region"
-                    value={addressData.state}
-                    onChange={(e) => handleAddressChange('state', e.target.value)}
-                    className="mt-1"
-                  />
+                <h4 className="font-medium mb-2">Your Current Addresses:</h4>
+                {customerAddresses.slice(0, 2).map((address) => (
+                  <div key={address._id} className="p-3 border rounded-lg mb-2">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-medium">{address.label}</span>
+                      {address.isDefault && (
+                        <Badge variant="default" className="text-xs">
+                          Default
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-600">
+                      {address.address}, {address.city}, {address.country}
+                    </p>
+                  </div>
+                ))}
+                {customerAddresses.length > 2 && (
+                  <p className="text-sm text-gray-600">+ {customerAddresses.length - 2} more addresses</p>
                 )}
               </div>
-              <div>
-                <Label htmlFor="postalCode">Postal Code *</Label>
-                <Input
-                  id="postalCode"
-                  value={addressData.postalCode}
-                  onChange={(e) => handleAddressChange('postalCode', e.target.value)}
-                  placeholder={addressData.country === 'SG' ? '123456' : 'Postal Code'}
-                  className={`mt-1 ${addressValidation?.errors.some(e => e.includes('postal')) ? 'border-red-500' : ''}`}
-                />
-              </div>
-            </div>
-            
-            <div className="flex gap-3">
-              <Button onClick={handleAddressSave} disabled={isLoading}>
-                {isLoading ? "Saving..." : "Save Address"}
-              </Button>
-              <Button variant="outline">Add New Address</Button>
-            </div>
+            )}
           </CardContent>
         </Card>
 
@@ -752,12 +541,25 @@ export default function CustomerAccountSettings({ loaderData }: Route.ComponentP
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="font-medium">SMS Notifications</p>
-                    <p className="text-sm text-muted-foreground">Receive important updates via SMS</p>
+                    <p className="text-sm text-muted-foreground">Critical updates via text message</p>
                   </div>
                   <input
                     type="checkbox"
                     checked={notificationSettings.smsNotifications}
                     onChange={(e) => handleNotificationChange('smsNotifications', e.target.checked)}
+                    className="w-4 h-4 text-primary focus:ring-primary border-gray-300 rounded"
+                  />
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">Push Notifications</p>
+                    <p className="text-sm text-muted-foreground">Browser notifications for real-time updates</p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={notificationSettings.pushNotifications}
+                    onChange={(e) => handleNotificationChange('pushNotifications', e.target.checked)}
                     className="w-4 h-4 text-primary focus:ring-primary border-gray-300 rounded"
                   />
                 </div>
@@ -789,12 +591,155 @@ export default function CustomerAccountSettings({ loaderData }: Route.ComponentP
                     className="w-4 h-4 text-primary focus:ring-primary border-gray-300 rounded"
                   />
                 </div>
+                
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">Weekly Reports</p>
+                    <p className="text-sm text-muted-foreground">Summary of your shipping activity</p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={notificationSettings.weeklyReports}
+                    onChange={(e) => handleNotificationChange('weeklyReports', e.target.checked)}
+                    className="w-4 h-4 text-primary focus:ring-primary border-gray-300 rounded"
+                  />
+                </div>
               </div>
             </div>
             
             <div className="flex gap-3 pt-4">
               <Button onClick={handleNotificationsSave} disabled={isLoading}>
                 {isLoading ? "Saving..." : "Save Preferences"}
+              </Button>
+              <Button variant="outline">Reset to Defaults</Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Privacy & Security */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="w-5 h-5" />
+              Privacy & Security
+            </CardTitle>
+            <CardDescription>
+              Manage your privacy settings and account security
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Two-Factor Authentication */}
+            <div className="space-y-4">
+              <h4 className="font-medium text-foreground">Account Security</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Button variant="outline" className="justify-start h-auto p-4">
+                  <div className="flex items-center gap-3">
+                    <Shield className="w-5 h-5 text-green-600" />
+                    <div className="text-left">
+                      <p className="font-medium">Enable Two-Factor Authentication</p>
+                      <p className="text-sm text-muted-foreground">Add an extra layer of security</p>
+                    </div>
+                  </div>
+                </Button>
+                
+                <Button variant="outline" className="justify-start h-auto p-4">
+                  <div className="flex items-center gap-3">
+                    <Key className="w-5 h-5 text-blue-600" />
+                    <div className="text-left">
+                      <p className="font-medium">Manage Login Sessions</p>
+                      <p className="text-sm text-muted-foreground">View and revoke active sessions</p>
+                    </div>
+                  </div>
+                </Button>
+              </div>
+            </div>
+
+            {/* Privacy Settings */}
+            <div className="space-y-4">
+              <h4 className="font-medium text-foreground">Privacy Preferences</h4>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-3 border rounded-lg">
+                  <div>
+                    <p className="font-medium">Profile Visibility</p>
+                    <p className="text-sm text-muted-foreground">Control who can see your profile information</p>
+                  </div>
+                  <select
+                    value={privacySettings.profileVisibility}
+                    onChange={(e) => handlePrivacyChange('profileVisibility', e.target.value)}
+                    className="px-3 py-1 border border-input bg-background rounded-md text-sm"
+                  >
+                    <option value="private">Private</option>
+                    <option value="public">Public</option>
+                  </select>
+                </div>
+                
+                <div className="flex items-center justify-between p-3 border rounded-lg">
+                  <div>
+                    <p className="font-medium">Marketing Communications</p>
+                    <p className="text-sm text-muted-foreground">Allow us to send you promotional content</p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={privacySettings.allowMarketing}
+                    onChange={(e) => handlePrivacyChange('allowMarketing', e.target.checked)}
+                    className="w-4 h-4 text-primary focus:ring-primary border-gray-300 rounded"
+                  />
+                </div>
+                
+                <div className="flex items-center justify-between p-3 border rounded-lg">
+                  <div>
+                    <p className="font-medium">Data Processing Consent</p>
+                    <p className="text-sm text-muted-foreground">Allow processing of your data for service improvement</p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={privacySettings.dataProcessingConsent}
+                    onChange={(e) => handlePrivacyChange('dataProcessingConsent', e.target.checked)}
+                    className="w-4 h-4 text-primary focus:ring-primary border-gray-300 rounded"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Data Management */}
+            <div className="space-y-4">
+              <h4 className="font-medium text-foreground">Data Management</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Button variant="outline" className="justify-start h-auto p-4">
+                  <div className="flex items-center gap-3">
+                    <Download className="w-5 h-5 text-purple-600" />
+                    <div className="text-left">
+                      <p className="font-medium">Download My Data</p>
+                      <p className="text-sm text-muted-foreground">Export all your account data</p>
+                    </div>
+                  </div>
+                </Button>
+                
+                <Button variant="outline" className="justify-start h-auto p-4 border-red-200 text-red-700 hover:bg-red-50">
+                  <div className="flex items-center gap-3">
+                    <Trash2 className="w-5 h-5 text-red-600" />
+                    <div className="text-left">
+                      <p className="font-medium">Delete Account</p>
+                      <p className="text-sm text-red-600">Permanently remove your account</p>
+                    </div>
+                  </div>
+                </Button>
+              </div>
+            </div>
+
+            {/* Security Notice */}
+            <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+              <h4 className="font-medium text-yellow-900 mb-2">🔒 Security Recommendation</h4>
+              <p className="text-sm text-yellow-800">
+                We recommend enabling two-factor authentication to secure your account, especially since you'll be receiving valuable packages. 
+                Regular security checkups help keep your account safe.
+              </p>
+            </div>
+
+            {/* Save Privacy Settings */}
+            <div className="flex gap-3 pt-4">
+              <Button onClick={handlePrivacySave} disabled={isLoading}>
+                {isLoading ? "Saving..." : "Save Privacy Settings"}
               </Button>
               <Button variant="outline">Reset to Defaults</Button>
             </div>
