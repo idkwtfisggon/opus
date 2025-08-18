@@ -1,6 +1,6 @@
 import type { Route } from "./+types/autocomplete";
 
-const GOOGLE_PLACES_API_KEY = process.env.GOOGLE_PLACES_API_KEY || '';
+const GOOGLE_PLACES_API_KEY = process.env.GOOGLE_PLACES_API_KEY || 'AIzaSyDepvSDx1JvevY4e-crsvBNBqiEYetW4Vg';
 
 export async function loader({ request }: Route.LoaderArgs) {
   const url = new URL(request.url);

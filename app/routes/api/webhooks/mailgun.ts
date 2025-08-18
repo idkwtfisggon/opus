@@ -9,7 +9,7 @@ import FormData from 'form-data';
 const mailgun = new Mailgun(FormData);
 const mg = mailgun.client({
   username: 'api',
-  key: process.env.MAILGUN_API_KEY || '',
+  key: process.env.MAILGUN_API_KEY || '7d29e6854ae52d2440989bc849a37ed4-16bc1610-51644a0f',
   url: 'https://api.mailgun.net', // US region
 });
 
