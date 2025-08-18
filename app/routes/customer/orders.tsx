@@ -1,6 +1,10 @@
 import type { Route } from "./+types/orders";
 import { Package, Search, Filter, Eye } from "lucide-react";
 import React, { useState } from "react";
+import { getAuth } from "@clerk/react-router/ssr.server";
+import { redirect } from "react-router";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -9,66 +13,25 @@ export function meta({}: Route.MetaArgs) {
   ];
 }
 
-export default function CustomerOrders() {
+export async function loader(args: Route.LoaderArgs) {
+  const { userId } = await getAuth(args);
+  
+  if (!userId) {
+    return redirect("/sign-in");
+  }
+
+  return { userId };
+}
+
+export default function CustomerOrders({ loaderData }: Route.ComponentProps) {
+  const { userId } = loaderData;
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
-  // TODO: Replace with real data from Convex
-  const mockOrders = [
-    {
-      id: "ORD-001",
-      status: "in_transit",
-      merchant: "Amazon",
-      destination: "Singapore",
-      trackingNumber: "DHL123456789",
-      createdAt: "2024-01-15",
-      estimatedDelivery: "2024-01-20",
-      weight: "2.5kg",
-      value: "$89.99",
-      items: ["MacBook Charger", "USB-C Hub"],
-      courier: "DHL Express"
-    },
-    {
-      id: "ORD-002", 
-      status: "arrived_at_warehouse",
-      merchant: "Nike Store",
-      destination: "Singapore",
-      trackingNumber: "UPS987654321",
-      createdAt: "2024-01-18",
-      estimatedDelivery: "2024-01-22",
-      weight: "1.2kg",
-      value: "$129.99",
-      items: ["Air Max Sneakers"],
-      courier: "UPS Standard"
-    },
-    {
-      id: "ORD-003",
-      status: "delivered",
-      merchant: "Best Buy",
-      destination: "Singapore", 
-      trackingNumber: "FEDEX456789123",
-      createdAt: "2024-01-10",
-      estimatedDelivery: "2024-01-16",
-      deliveredAt: "2024-01-16",
-      weight: "0.8kg",
-      value: "$45.99",
-      items: ["Bluetooth Headphones"],
-      courier: "FedEx Express"
-    },
-    {
-      id: "ORD-004",
-      status: "packed",
-      merchant: "REI",
-      destination: "Singapore",
-      trackingNumber: "DHL555444333",
-      createdAt: "2024-01-19",
-      estimatedDelivery: "2024-01-24",
-      weight: "3.1kg", 
-      value: "$199.99",
-      items: ["Hiking Backpack", "Water Bottle"],
-      courier: "DHL Standard"
-    }
-  ];
+  // Get real orders from Convex
+  const ordersData = useQuery(api.orders.getCustomerOrders, {});
+  const orders = ordersData?.orders || [];
+  const isLoading = ordersData === undefined;
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -87,13 +50,35 @@ export default function CustomerOrders() {
     ).join(' ');
   };
 
-  const filteredOrders = mockOrders.filter(order => {
-    const matchesSearch = order.merchant.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  const filteredOrders = orders.filter(order => {
+    const matchesSearch = order.merchantName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          order.trackingNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         order.id.toLowerCase().includes(searchTerm.toLowerCase());
+                         (order.courierTrackingNumber !== "-" && order.courierTrackingNumber.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                         order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === "all" || order.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
+
+  const formatDate = (timestamp: number) => {
+    return new Date(timestamp).toLocaleDateString();
+  };
+
+  const formatWeight = (weight: number | null) => {
+    return weight ? `${weight}kg` : "-";
+  };
+
+  const formatValue = (value: number | null, currency?: string) => {
+    if (!value) return "-";
+    return `${currency || "USD"} ${value.toFixed(2)}`;
+  };
+
+  const getDisplayTrackingNumber = (order: any) => {
+    // Show courier tracking number if shipped, otherwise show internal tracking
+    if (order.status === "in_transit" || order.status === "delivered") {
+      return order.courierTrackingNumber !== "-" ? order.courierTrackingNumber : order.trackingNumber;
+    }
+    return order.trackingNumber;
+  };
 
   return (
     <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
@@ -153,15 +138,26 @@ export default function CustomerOrders() {
           </div>
           
           <div className="divide-y divide-gray-200">
-            {filteredOrders.length === 0 ? (
+            {isLoading ? (
+              <div className="px-6 py-12 text-center">
+                <div className="animate-pulse">
+                  <Package className="w-12 h-12 mx-auto text-gray-300 mb-4" />
+                  <p className="text-gray-400">Loading your orders...</p>
+                </div>
+              </div>
+            ) : filteredOrders.length === 0 ? (
               <div className="px-6 py-12 text-center">
                 <Package className="w-12 h-12 mx-auto text-gray-400 mb-4" />
-                <p className="text-gray-500 text-lg font-medium">No orders found</p>
-                <p className="text-gray-400">Try adjusting your search or filter criteria</p>
+                <p className="text-gray-500 text-lg font-medium">
+                  {orders.length === 0 ? "No orders yet" : "No orders found"}
+                </p>
+                <p className="text-gray-400">
+                  {orders.length === 0 ? "Create your first order to get started" : "Try adjusting your search or filter criteria"}
+                </p>
               </div>
             ) : (
               filteredOrders.map((order) => (
-                <div key={order.id} className="px-6 py-6 hover:bg-gray-50 transition-colors">
+                <div key={order._id} className="px-6 py-6 hover:bg-gray-50 transition-colors">
                   <div className="flex items-start justify-between">
                     {/* Order Info */}
                     <div className="flex items-start space-x-4 flex-1">
@@ -169,33 +165,29 @@ export default function CustomerOrders() {
                         <div className="flex items-start justify-between">
                           <div>
                             <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                              {order.merchant}
+                              {order.merchantName}
                             </h3>
                             <p className="text-sm text-gray-600 mb-2">
-                              Order {order.id} • {order.destination}
+                              Order {order.orderNumber.slice(-8)} • {order.warehouse?.country || "Processing"}
                             </p>
                             
-                            {/* Items */}
+                            {/* Item Category */}
                             <div className="mb-3">
-                              <p className="text-sm text-gray-500 mb-1">Items:</p>
-                              <div className="flex flex-wrap gap-1">
-                                {order.items.map((item, index) => (
-                                  <span key={index} className="inline-flex items-center px-2 py-1 rounded-md bg-gray-100 text-xs font-medium text-gray-700">
-                                    {item}
-                                  </span>
-                                ))}
-                              </div>
+                              <p className="text-sm text-gray-500 mb-1">Category:</p>
+                              <span className="inline-flex items-center px-2 py-1 rounded-md bg-blue-100 text-xs font-medium text-blue-700">
+                                {order.itemCategory}
+                              </span>
                             </div>
 
                             {/* Order Details */}
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
                               <div>
                                 <p className="text-gray-500">Weight</p>
-                                <p className="font-medium text-gray-900">{order.weight}</p>
+                                <p className="font-medium text-gray-900">{formatWeight(order.declaredWeight)}</p>
                               </div>
                               <div>
                                 <p className="text-gray-500">Value</p>
-                                <p className="font-medium text-gray-900">{order.value}</p>
+                                <p className="font-medium text-gray-900">{formatValue(order.declaredValue, order.currency)}</p>
                               </div>
                               <div>
                                 <p className="text-gray-500">Courier</p>
@@ -203,7 +195,7 @@ export default function CustomerOrders() {
                               </div>
                               <div>
                                 <p className="text-gray-500">Created</p>
-                                <p className="font-medium text-gray-900">{order.createdAt}</p>
+                                <p className="font-medium text-gray-900">{formatDate(order.createdAt)}</p>
                               </div>
                             </div>
                           </div>
@@ -219,15 +211,26 @@ export default function CustomerOrders() {
                       
                       <div className="text-right">
                         <p className="text-sm font-medium text-gray-900 mb-1">
-                          {order.trackingNumber}
+                          {getDisplayTrackingNumber(order)}
                         </p>
-                        {order.status === 'delivered' ? (
+                        <p className="text-xs text-gray-400 mb-1">
+                          {order.status === "in_transit" || order.status === "delivered" ? "Courier Tracking" : "Internal Tracking"}
+                        </p>
+                        {order.status === 'delivered' && order.deliveredAt ? (
                           <p className="text-sm text-green-600 font-medium">
-                            Delivered {order.deliveredAt}
+                            Delivered {formatDate(order.deliveredAt)}
+                          </p>
+                        ) : order.shippedAt ? (
+                          <p className="text-sm text-blue-600 font-medium">
+                            Shipped {formatDate(order.shippedAt)}
+                          </p>
+                        ) : order.receivedAt ? (
+                          <p className="text-sm text-purple-600 font-medium">
+                            At warehouse since {formatDate(order.receivedAt)}
                           </p>
                         ) : (
                           <p className="text-sm text-gray-500">
-                            Est: {order.estimatedDelivery}
+                            Processing...
                           </p>
                         )}
                       </div>

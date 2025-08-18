@@ -5,15 +5,17 @@ import type { Route } from "./+types/account";
 import { useUser } from "@clerk/react-router";
 import { useState } from "react";
 import * as React from "react";
-import { useMutation, useQuery } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Separator } from "~/components/ui/separator";
 import { Badge } from "~/components/ui/badge";
-import { UserCircle, Mail, Key, Shield, Bell, Trash2, Download, Eye, EyeOff, X, MapPin, AlertCircle, Info, MapPin as AddressIcon } from "lucide-react";
+import { UserCircle, Mail, Key, Shield, Bell, Trash2, Download, Eye, EyeOff, X, MapPin, AlertCircle, Info, MapPin as AddressIcon, CreditCard, Plus, Star, Lock } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
+import StripeProvider from "~/components/stripe/StripeProvider";
+import AddPaymentMethodForm from "~/components/stripe/AddPaymentMethodForm";
 
 export async function loader(args: Route.LoaderArgs) {
   const { userId } = await getAuth(args);
@@ -38,8 +40,15 @@ export default function CustomerAccountSettings({ loaderData }: Route.ComponentP
   const addCustomerAddress = useMutation(api.customerDashboard.addCustomerAddress);
   const updateCustomerAddress = useMutation(api.customerDashboard.updateCustomerAddress);
   
-  // Get customer addresses
+  // Stripe mutations
+  const createSetupIntent = useAction(api.stripe.createSetupIntent);
+  const setDefaultPaymentMethod = useAction(api.stripe.setDefaultPaymentMethod);
+  const deletePaymentMethod = useAction(api.stripe.deletePaymentMethod);
+  
+  // Get customer addresses and payment methods
   const customerAddresses = useQuery(api.customerDashboard.getCustomerAddresses);
+  const getPaymentMethods = useAction(api.stripe.getPaymentMethods);
+  const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
   
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -77,11 +86,28 @@ export default function CustomerAccountSettings({ loaderData }: Route.ComponentP
     allowMarketing: false,
     dataProcessingConsent: true
   });
+
+  // Payment Methods State
+  const [showAddCard, setShowAddCard] = useState(false);
+  const [setupIntent, setSetupIntent] = useState<{ clientSecret: string; setupIntentId: string } | null>(null);
   
   const showNotification = (message: string, type: 'success' | 'error' = 'success') => {
     setNotification({ show: true, message, type });
     setTimeout(() => setNotification({ show: false, message: '', type: 'success' }), 4000);
   };
+
+  // Load payment methods
+  React.useEffect(() => {
+    const loadPaymentMethods = async () => {
+      try {
+        const methods = await getPaymentMethods({});
+        setPaymentMethods(methods || []);
+      } catch (error) {
+        console.error("Failed to load payment methods:", error);
+      }
+    };
+    loadPaymentMethods();
+  }, []);
 
   // Update form data when userProfile loads
   React.useEffect(() => {
@@ -228,6 +254,117 @@ export default function CustomerAccountSettings({ loaderData }: Route.ComponentP
     } catch (error: any) {
       console.error("Error updating privacy settings:", error);
       showNotification(`Failed to update privacy settings: ${error.message || error}`, 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Payment Methods Functions
+  const getCardBrandIcon = (brand: string) => {
+    const brandLower = brand.toLowerCase();
+    const iconClass = "w-8 h-8";
+    
+    if (brandLower === "visa") return <div className={`${iconClass} bg-blue-600 rounded flex items-center justify-center text-white text-xs font-bold`}>VISA</div>;
+    if (brandLower === "mastercard") return <div className={`${iconClass} bg-red-600 rounded flex items-center justify-center text-white text-xs font-bold`}>MC</div>;
+    if (brandLower === "amex") return <div className={`${iconClass} bg-green-600 rounded flex items-center justify-center text-white text-xs font-bold`}>AMEX</div>;
+    if (brandLower === "discover") return <div className={`${iconClass} bg-orange-600 rounded flex items-center justify-center text-white text-xs font-bold`}>DISC</div>;
+    return <CreditCard className={`${iconClass} text-gray-500`} />;
+  };
+
+  const formatCardNumber = (value: string) => {
+    // Remove all non-numeric characters
+    const numericValue = value.replace(/\D/g, '');
+    // Add spaces every 4 digits
+    return numericValue.replace(/(\d{4})(?=\d)/g, '$1 ').trim();
+  };
+
+  const detectCardBrand = (cardNumber: string) => {
+    const number = cardNumber.replace(/\D/g, '');
+    if (number.startsWith('4')) return 'visa';
+    if (number.startsWith('5') || number.startsWith('2')) return 'mastercard';
+    if (number.startsWith('3')) return 'amex';
+    if (number.startsWith('6')) return 'discover';
+    return 'unknown';
+  };
+
+  const handleCardInputChange = (field: string, value: string) => {
+    if (field === 'cardNumber') {
+      const formatted = formatCardNumber(value);
+      if (formatted.replace(/\s/g, '').length <= 16) {
+        setCardForm(prev => ({ ...prev, [field]: formatted }));
+      }
+    } else if (field === 'expMonth' || field === 'expYear') {
+      const numericValue = value.replace(/\D/g, '');
+      if (field === 'expMonth' && numericValue.length <= 2 && parseInt(numericValue) <= 12) {
+        setCardForm(prev => ({ ...prev, [field]: numericValue }));
+      } else if (field === 'expYear' && numericValue.length <= 4) {
+        setCardForm(prev => ({ ...prev, [field]: numericValue }));
+      }
+    } else if (field === 'cvc') {
+      const numericValue = value.replace(/\D/g, '');
+      if (numericValue.length <= 4) {
+        setCardForm(prev => ({ ...prev, [field]: numericValue }));
+      }
+    } else {
+      setCardForm(prev => ({ ...prev, [field]: value }));
+    }
+  };
+
+  const handleAddCard = async () => {
+    setIsLoading(true);
+    try {
+      const result = await createSetupIntent();
+      setSetupIntent(result);
+      setShowAddCard(true);
+    } catch (error: any) {
+      showNotification(`Failed to prepare payment method: ${error.message}`, 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handlePaymentMethodAdded = async () => {
+    setShowAddCard(false);
+    setSetupIntent(null);
+    showNotification("Payment method added successfully!");
+    // Refresh payment methods
+    try {
+      const methods = await getPaymentMethods({});
+      setPaymentMethods(methods || []);
+    } catch (error) {
+      console.error("Failed to refresh payment methods:", error);
+    }
+  };
+
+  const handleSetDefaultCard = async (cardId: string) => {
+    setIsLoading(true);
+    try {
+      await setDefaultPaymentMethod({ paymentMethodId: cardId });
+      showNotification("Default payment method updated!");
+      // Refresh payment methods
+      const methods = await getPaymentMethods({});
+      setPaymentMethods(methods || []);
+    } catch (error: any) {
+      showNotification(`Failed to update default payment method: ${error.message}`, 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeleteCard = async (cardId: string) => {
+    if (!confirm("Are you sure you want to delete this payment method?")) {
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      await deletePaymentMethod({ paymentMethodId: cardId });
+      showNotification("Payment method deleted successfully!");
+      // Refresh payment methods
+      const methods = await getPaymentMethods({});
+      setPaymentMethods(methods || []);
+    } catch (error: any) {
+      showNotification(`Failed to delete payment method: ${error.message}`, 'error');
     } finally {
       setIsLoading(false);
     }
@@ -416,6 +553,134 @@ export default function CustomerAccountSettings({ loaderData }: Route.ComponentP
                 )}
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Payment Methods */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CreditCard className="w-5 h-5" />
+              Payment Methods
+            </CardTitle>
+            <CardDescription>
+              Manage your credit cards and payment preferences for shipping orders
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Existing Payment Methods */}
+            {paymentMethods.length > 0 ? (
+              <div className="space-y-4">
+                <h4 className="font-medium text-foreground">Your Payment Methods</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {paymentMethods.map((method) => (
+                    <div key={method.id} className="p-4 border rounded-lg bg-gradient-to-r from-gray-50 to-gray-100 hover:from-gray-100 hover:to-gray-150 transition-all">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          {getCardBrandIcon(method.brand)}
+                          <div>
+                            <p className="font-medium">•••• •••• •••• {method.last4}</p>
+                            <p className="text-sm text-muted-foreground">
+                              Expires {method.expMonth.toString().padStart(2, '0')}/{method.expYear}
+                            </p>
+                          </div>
+                        </div>
+                        {method.isDefault && (
+                          <Badge variant="default" className="text-xs">
+                            <Star className="w-3 h-3 mr-1" />
+                            Default
+                          </Badge>
+                        )}
+                      </div>
+                      
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm text-muted-foreground">{method.holderName}</p>
+                        <div className="flex gap-2">
+                          {!method.isDefault && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleSetDefaultCard(method.id)}
+                              disabled={isLoading}
+                              className="text-xs"
+                            >
+                              Set Default
+                            </Button>
+                          )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDeleteCard(method.id)}
+                            disabled={isLoading}
+                            className="text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <CreditCard className="w-12 h-12 mx-auto text-gray-400 mb-4" />
+                <p className="text-gray-500 text-lg font-medium">No payment methods added</p>
+                <p className="text-gray-400">Add a credit card to start placing orders</p>
+              </div>
+            )}
+
+            {/* Add New Card Section */}
+            {!showAddCard ? (
+              <div className="pt-4">
+                <Button onClick={handleAddCard} disabled={isLoading} className="w-full md:w-auto">
+                  <Plus className="w-4 h-4 mr-2" />
+                  {isLoading ? "Preparing..." : "Add New Payment Method"}
+                </Button>
+              </div>
+            ) : setupIntent ? (
+              <div className="space-y-4 p-4 border rounded-lg bg-blue-50">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-medium text-foreground">Add New Card</h4>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setShowAddCard(false);
+                      setSetupIntent(null);
+                    }}
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+
+                <StripeProvider clientSecret={setupIntent.clientSecret}>
+                  <AddPaymentMethodForm
+                    onSuccess={handlePaymentMethodAdded}
+                    onCancel={() => {
+                      setShowAddCard(false);
+                      setSetupIntent(null);
+                    }}
+                    clientSecret={setupIntent.clientSecret}
+                  />
+                </StripeProvider>
+              </div>
+            ) : null}
+
+            {/* Payment Info Notice */}
+            <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <div className="flex items-center gap-2 mb-2">
+                <CreditCard className="w-4 h-4 text-blue-600" />
+                <h4 className="font-medium text-blue-900">How Payment Works</h4>
+              </div>
+              <ul className="text-sm text-blue-800 space-y-1">
+                <li>• Add your card once - no need to re-enter details</li>
+                <li>• Get charged automatically when you create orders</li>
+                <li>• Just like Uber - simple and seamless</li>
+                <li>• Secure processing by Stripe with bank-level encryption</li>
+                <li>• Update or remove cards anytime</li>
+              </ul>
+            </div>
           </CardContent>
         </Card>
 

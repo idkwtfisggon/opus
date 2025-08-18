@@ -1,0 +1,753 @@
+import { mutation, query } from "./_generated/server";
+import { v } from "convex/values";
+import { api } from "./_generated/api";
+
+// Enhanced address normalization with abbreviation handling
+const normalizeAddress = (addr: string): string => {
+  return addr
+    .toLowerCase()
+    .trim()
+    // Normalize common abbreviations
+    .replace(/\bavenue\b/g, 'ave')
+    .replace(/\bave\.\b/g, 'ave')
+    .replace(/\broad\b/g, 'rd')
+    .replace(/\brd\.\b/g, 'rd')
+    .replace(/\bstreet\b/g, 'st')
+    .replace(/\bst\.\b/g, 'st')
+    .replace(/\bboulevard\b/g, 'blvd')
+    .replace(/\bblvd\.\b/g, 'blvd')
+    .replace(/\bdrive\b/g, 'dr')
+    .replace(/\bdr\.\b/g, 'dr')
+    .replace(/\blane\b/g, 'ln')
+    .replace(/\bln\.\b/g, 'ln')
+    .replace(/\bplace\b/g, 'pl')
+    .replace(/\bpl\.\b/g, 'pl')
+    .replace(/\bunit\b/g, 'u')
+    .replace(/\bbuilding\b/g, 'bldg')
+    .replace(/\bblock\b/g, 'blk')
+    .replace(/\bapartment\b/g, 'apt')
+    .replace(/\bfloor\b/g, 'fl')
+    .replace(/\bsuite\b/g, 'ste')
+    // Remove punctuation and normalize spaces
+    .replace(/[^\w\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
+// Extract postal code from address
+const extractPostalCode = (address: string): string | null => {
+  // Singapore postal codes (6 digits)
+  const sgPostal = address.match(/\b\d{6}\b/);
+  if (sgPostal) return sgPostal[0];
+  
+  // US postal codes (5 digits or 5+4)
+  const usPostal = address.match(/\b\d{5}(?:-\d{4})?\b/);
+  if (usPostal) return usPostal[0];
+  
+  // UK postal codes
+  const ukPostal = address.match(/\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b/i);
+  if (ukPostal) return ukPostal[0].replace(/\s/g, '').toUpperCase();
+  
+  return null;
+};
+
+// Calculate address similarity percentage (excluding postal code)
+const calculateAddressSimilarity = (deliveryAddress: string, warehouseAddress: string): number => {
+  const normalizedDelivery = normalizeAddress(deliveryAddress);
+  const normalizedWarehouse = normalizeAddress(warehouseAddress);
+
+  // Remove postal codes for address comparison
+  const deliveryPostal = extractPostalCode(deliveryAddress);
+  const warehousePostal = extractPostalCode(warehouseAddress);
+  
+  let cleanDelivery = normalizedDelivery;
+  let cleanWarehouse = normalizedWarehouse;
+  
+  if (deliveryPostal) {
+    cleanDelivery = cleanDelivery.replace(deliveryPostal.toLowerCase(), '').trim();
+  }
+  if (warehousePostal) {
+    cleanWarehouse = cleanWarehouse.replace(warehousePostal.toLowerCase(), '').trim();
+  }
+
+  // Split into words for comparison
+  const deliveryWords = cleanDelivery.split(' ').filter(w => w.length > 1);
+  const warehouseWords = cleanWarehouse.split(' ').filter(w => w.length > 1);
+  
+  if (deliveryWords.length === 0 || warehouseWords.length === 0) {
+    return 0;
+  }
+
+  let matchingWords = 0;
+  
+  // Count how many delivery words are found in warehouse words
+  for (const word of deliveryWords) {
+    if (warehouseWords.includes(word)) {
+      matchingWords++;
+    }
+  }
+
+  // Calculate similarity based on delivery words (since delivery is usually shorter/cleaner)
+  // This way extra words in warehouse address don't penalize the match
+  return (matchingWords / deliveryWords.length) * 100; // Return percentage
+};
+
+// Comprehensive verification for ASN creation
+interface VerificationResult {
+  isHighConfidence: boolean;
+  isMediumConfidence: boolean;
+  postalCodeMatch: boolean;
+  addressSimilarity: number;
+  customerIdMatch: boolean;
+  customerEmailMatch: boolean;
+  reasons: string[];
+}
+
+const verifyPackageOwnership = (
+  deliveryAddress: string,
+  warehouseAddress: string,
+  customerRefFromPdf: string | null,
+  customerEmailFromEmail: string,
+  registeredCustomerId: string,
+  registeredCustomerEmail: string
+): VerificationResult => {
+  const reasons: string[] = [];
+  
+  // 1. Postal Code Verification (must be 100% match)
+  const deliveryPostal = extractPostalCode(deliveryAddress);
+  const warehousePostal = extractPostalCode(warehouseAddress);
+  const postalCodeMatch = deliveryPostal === warehousePostal;
+  
+  if (!postalCodeMatch) {
+    reasons.push(`Postal code mismatch: ${deliveryPostal} vs ${warehousePostal}`);
+  }
+
+  // 2. Address Similarity
+  const addressSimilarity = calculateAddressSimilarity(deliveryAddress, warehouseAddress);
+  
+  // 3. Customer ID Verification (100% match required)
+  const customerIdMatch = customerRefFromPdf === registeredCustomerId;
+  if (!customerIdMatch) {
+    reasons.push(`Customer ID mismatch: ${customerRefFromPdf} vs ${registeredCustomerId}`);
+  }
+
+  // 4. Customer Email Verification (100% match required)
+  const customerEmailMatch = customerEmailFromEmail.toLowerCase() === registeredCustomerEmail.toLowerCase();
+  if (!customerEmailMatch) {
+    reasons.push(`Customer email mismatch: ${customerEmailFromEmail} vs ${registeredCustomerEmail}`);
+  }
+
+  // HIGH Confidence Criteria
+  const isHighConfidence = 
+    postalCodeMatch && 
+    addressSimilarity >= 90 && 
+    customerIdMatch && 
+    customerEmailMatch;
+
+  // MEDIUM Confidence Criteria  
+  const isMediumConfidence = 
+    postalCodeMatch && 
+    addressSimilarity >= 80 && 
+    customerIdMatch && 
+    customerEmailMatch;
+
+  if (addressSimilarity < 80) {
+    reasons.push(`Address similarity too low: ${addressSimilarity.toFixed(1)}%`);
+  }
+
+  return {
+    isHighConfidence,
+    isMediumConfidence,
+    postalCodeMatch,
+    addressSimilarity,
+    customerIdMatch,
+    customerEmailMatch,
+    reasons
+  };
+};
+
+// Create ASN from email processing
+export const createAdvanceShipmentNotice = mutation({
+  args: {
+    forwarderId: v.string(),
+    customerId: v.string(),
+    customerRef: v.string(),
+    trackingNumber: v.optional(v.string()),
+    orderNumbers: v.array(v.string()),
+    shopName: v.optional(v.string()),
+    estimatedArrival: v.optional(v.number()),
+    deliveryAddress: v.optional(v.string()),
+    confidence: v.union(v.literal("HIGH"), v.literal("MEDIUM")),
+    source: v.union(
+      v.literal("SHIPPING_LABEL"),
+      v.literal("TRACKING_API"),
+      v.literal("MANUAL"),
+      v.literal("EMAIL_ANALYSIS")
+    ),
+    packageDetails: v.optional(v.object({
+      estimatedValue: v.optional(v.number()),
+      currency: v.optional(v.string()),
+      weight: v.optional(v.number()),
+      description: v.optional(v.string()),
+    })),
+    emailMessageId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // Check if ASN already exists for this tracking number or customer ref
+    const existingAsn = await ctx.db
+      .query("advanceShipmentNotices")
+      .withIndex("by_forwarder", (q) => q.eq("forwarderId", args.forwarderId))
+      .filter((q) => 
+        q.or(
+          q.eq(q.field("trackingNumber"), args.trackingNumber),
+          q.eq(q.field("customerRef"), args.customerRef)
+        )
+      )
+      .first();
+
+    if (existingAsn) {
+      console.log("ASN already exists for this package", { 
+        existingAsnId: existingAsn._id, 
+        trackingNumber: args.trackingNumber,
+        customerRef: args.customerRef 
+      });
+      return existingAsn._id;
+    }
+
+    // Create new ASN
+    const asnId = await ctx.db.insert("advanceShipmentNotices", {
+      forwarderId: args.forwarderId,
+      customerId: args.customerId,
+      customerRef: args.customerRef,
+      trackingNumber: args.trackingNumber,
+      orderNumbers: args.orderNumbers,
+      shopName: args.shopName,
+      estimatedArrival: args.estimatedArrival,
+      deliveryAddress: args.deliveryAddress,
+      confidence: args.confidence,
+      source: args.source,
+      packageDetails: args.packageDetails,
+      status: "PENDING",
+      emailMessageId: args.emailMessageId,
+      createdAt: Date.now(),
+      expiresAt: Date.now() + (30 * 24 * 60 * 60 * 1000), // 30 days from now
+    });
+
+    console.log("Created ASN", { 
+      asnId, 
+      forwarderId: args.forwarderId, 
+      customerRef: args.customerRef,
+      source: args.source,
+      confidence: args.confidence 
+    });
+
+    return asnId;
+  },
+});
+
+// Get ASNs for a forwarder
+export const getForwarderAsns = query({
+  args: {
+    forwarderId: v.string(),
+    status: v.optional(v.union(
+      v.literal("PENDING"),
+      v.literal("ARRIVED"),
+      v.literal("PROCESSED"),
+      v.literal("EXPIRED"),
+      v.literal("CANCELLED")
+    )),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, { forwarderId, status, limit = 50 }) => {
+    let query = ctx.db
+      .query("advanceShipmentNotices")
+      .withIndex("by_forwarder_status", (q) => q.eq("forwarderId", forwarderId));
+
+    if (status) {
+      query = query.filter((q) => q.eq(q.field("status"), status));
+    }
+
+    const asns = await query
+      .order("desc")
+      .take(limit);
+
+    // Enrich with customer names
+    const enrichedAsns = await Promise.all(
+      asns.map(async (asn) => {
+        const customer = await ctx.db.get(asn.customerId as any);
+        return {
+          ...asn,
+          customerName: (customer as any)?.name || "Unknown Customer",
+          customerEmail: (customer as any)?.email || "",
+        };
+      })
+    );
+
+    return enrichedAsns;
+  },
+});
+
+// Mark ASN as arrived (when package physically arrives)
+export const markAsnArrived = mutation({
+  args: {
+    asnId: v.string(),
+    arrivedFromCarrier: v.optional(v.string()),
+    processingNotes: v.optional(v.string()),
+  },
+  handler: async (ctx, { asnId, arrivedFromCarrier, processingNotes }) => {
+    const asn = await ctx.db.get(asnId as any);
+    if (!asn) {
+      throw new Error("ASN not found");
+    }
+
+    await ctx.db.patch(asnId as any, {
+      status: "ARRIVED",
+      arrivedAt: Date.now(),
+      arrivedFromCarrier,
+      processingNotes,
+    });
+
+    console.log("Marked ASN as arrived", { asnId, arrivedFromCarrier });
+    return asnId;
+  },
+});
+
+// Mark ASN as processed (when package is processed and forwarded)
+export const markAsnProcessed = mutation({
+  args: {
+    asnId: v.string(),
+    orderId: v.optional(v.string()),
+    processingNotes: v.optional(v.string()),
+  },
+  handler: async (ctx, { asnId, orderId, processingNotes }) => {
+    const asn = await ctx.db.get(asnId as any);
+    if (!asn) {
+      throw new Error("ASN not found");
+    }
+
+    await ctx.db.patch(asnId as any, {
+      status: "PROCESSED",
+      processedAt: Date.now(),
+      orderId,
+      processingNotes,
+    });
+
+    console.log("Marked ASN as processed", { asnId, orderId });
+    return asnId;
+  },
+});
+
+// Customer manually creates ASN (self-service fallback)
+export const createManualAsn = mutation({
+  args: {
+    customerId: v.string(),
+    forwarderId: v.string(),
+    customerRef: v.string(),
+    trackingNumber: v.optional(v.string()),
+    orderNumbers: v.array(v.string()),
+    shopName: v.optional(v.string()),
+    emailMessageId: v.string(),
+    packageDescription: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    // Verify customer ownership of email
+    const emailMessage = await ctx.db.get(args.emailMessageId as any);
+    if (!emailMessage || (emailMessage as any).customerId !== args.customerId) {
+      throw new Error("Invalid email message or not owned by customer");
+    }
+
+    // Create manual ASN
+    const asnId = await ctx.db.insert("advanceShipmentNotices", {
+      forwarderId: args.forwarderId,
+      customerId: args.customerId,
+      customerRef: args.customerRef,
+      trackingNumber: args.trackingNumber,
+      orderNumbers: args.orderNumbers,
+      shopName: args.shopName,
+      estimatedArrival: undefined, // Customer doesn't provide this
+      deliveryAddress: undefined, // Customer doesn't have shipping label
+      confidence: "MEDIUM", // Manual entries are medium confidence
+      source: "MANUAL",
+      packageDetails: args.packageDescription ? {
+        description: args.packageDescription
+      } : undefined,
+      status: "PENDING",
+      emailMessageId: args.emailMessageId,
+      createdAt: Date.now(),
+      expiresAt: Date.now() + (30 * 24 * 60 * 60 * 1000), // 30 days
+    });
+
+    console.log("Created manual ASN", { asnId, customerId: args.customerId, forwarderId: args.forwarderId });
+    return asnId;
+  },
+});
+
+// Create missing ASN review when auto-detection fails
+export const createMissingAsnReview = mutation({
+  args: {
+    customerId: v.string(),
+    emailMessageId: v.string(),
+    emailSubject: v.string(),
+    trackingNumbers: v.array(v.string()),
+    shopName: v.optional(v.string()),
+    emailReceivedAt: v.number(),
+    suggestedForwarder: v.optional(v.string()),
+    suggestedReason: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    // Check if review already exists for this email
+    const existingReview = await ctx.db
+      .query("missingAsnReviews")
+      .withIndex("by_email", (q) => q.eq("emailMessageId", args.emailMessageId))
+      .first();
+
+    if (existingReview) {
+      return existingReview._id;
+    }
+
+    const reviewId = await ctx.db.insert("missingAsnReviews", {
+      customerId: args.customerId,
+      emailMessageId: args.emailMessageId,
+      emailSubject: args.emailSubject,
+      trackingNumbers: args.trackingNumbers,
+      shopName: args.shopName,
+      emailReceivedAt: args.emailReceivedAt,
+      suggestedForwarder: args.suggestedForwarder,
+      suggestedReason: args.suggestedReason,
+      status: "PENDING",
+      createdAt: Date.now(),
+      expiresAt: Date.now() + (30 * 24 * 60 * 60 * 1000), // 30 days
+    });
+
+    console.log("Created missing ASN review", { reviewId, customerId: args.customerId });
+    return reviewId;
+  },
+});
+
+// Get customer's missing ASN reviews
+export const getCustomerMissingAsnReviews = query({
+  args: {
+    customerId: v.string(),
+    status: v.optional(v.union(
+      v.literal("PENDING"),
+      v.literal("ASN_CREATED"),
+      v.literal("DISMISSED"),
+      v.literal("EXPIRED")
+    )),
+  },
+  handler: async (ctx, { customerId, status = "PENDING" }) => {
+    return await ctx.db
+      .query("missingAsnReviews")
+      .withIndex("by_customer_status", (q) => 
+        q.eq("customerId", customerId).eq("status", status)
+      )
+      .order("desc")
+      .take(20);
+  },
+});
+
+// Get customer's ASNs
+export const getCustomerAsns = query({
+  args: {
+    customerId: v.string(),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, { customerId, limit = 20 }) => {
+    const asns = await ctx.db
+      .query("advanceShipmentNotices")
+      .withIndex("by_customer", (q) => q.eq("customerId", customerId))
+      .order("desc")
+      .take(limit);
+
+    // Enrich with forwarder names
+    const enrichedAsns = await Promise.all(
+      asns.map(async (asn) => {
+        const forwarder = await ctx.db.get(asn.forwarderId as any);
+        return {
+          ...asn,
+          forwarderName: (forwarder as any)?.businessName || "Unknown Forwarder",
+        };
+      })
+    );
+
+    return enrichedAsns;
+  },
+});
+
+// Dismiss missing ASN review
+export const dismissMissingAsnReview = mutation({
+  args: {
+    reviewId: v.string(),
+    dismissalReason: v.optional(v.string()),
+  },
+  handler: async (ctx, { reviewId, dismissalReason }) => {
+    await ctx.db.patch(reviewId as any, {
+      status: "DISMISSED",
+      dismissalReason,
+      reviewedAt: Date.now(),
+    });
+
+    console.log("Dismissed missing ASN review", { reviewId, dismissalReason });
+    return reviewId;
+  },
+});
+
+// Link missing ASN review to created ASN
+export const linkMissingAsnReviewToAsn = mutation({
+  args: {
+    reviewId: v.string(),
+    asnId: v.string(),
+  },
+  handler: async (ctx, { reviewId, asnId }) => {
+    await ctx.db.patch(reviewId as any, {
+      status: "ASN_CREATED",
+      createdAsnId: asnId,
+      reviewedAt: Date.now(),
+    });
+
+    console.log("Linked missing ASN review to ASN", { reviewId, asnId });
+    return reviewId;
+  },
+});
+
+// Main function to try creating ASN from processed email
+export const tryCreateAsnFromEmail = mutation({
+  args: {
+    emailId: v.string(),
+    emailData: v.object({
+      from: v.string(),
+      to: v.string(),
+      subject: v.string(),
+      body: v.string(),
+      attachments: v.array(v.object({
+        filename: v.string(),
+        contentType: v.string(),
+        storageId: v.string(),
+        size: v.number(),
+      })),
+    }),
+    extractedData: v.object({
+      trackingNumbers: v.array(v.string()),
+      orderNumbers: v.array(v.string()),
+      shopName: v.optional(v.string()),
+      estimatedValue: v.optional(v.number()),
+      currency: v.optional(v.string()),
+      weight: v.optional(v.number()),
+    }),
+    pdfShippingData: v.optional(v.object({
+      deliveryAddress: v.optional(v.string()),
+      customerRef: v.optional(v.string()),
+      senderAddress: v.optional(v.string()),
+      estimatedDelivery: v.optional(v.number()),
+    })),
+  },
+  handler: async (ctx, args): Promise<any> => {
+    // Get email message record to find customer
+    const emailMessage = await ctx.db.get(args.emailId as any);
+    if (!emailMessage) {
+      return { success: false, reason: "Email message not found" };
+    }
+
+    const customer = await ctx.db.get((emailMessage as any).customerId as any);
+    if (!customer) {
+      return { success: false, reason: "Customer not found" };
+    }
+
+    // Extract customer reference from email address (firstname+7digits format)
+    let customerRef = (emailMessage as any).customerEmail.split('@')[0].toUpperCase();
+
+    let confidence: "HIGH" | "MEDIUM" | null = null;
+    let forwarderId: string | null = null;
+    let source: "SHIPPING_LABEL" | "TRACKING_API" | "EMAIL_ANALYSIS" | null = null;
+    let deliveryAddress: string | null = null;
+    let estimatedArrival: number | null = null;
+
+    // ENHANCED VERIFICATION: PDF shipping label analysis with strict criteria
+    if (args.pdfShippingData?.deliveryAddress) {
+      deliveryAddress = args.pdfShippingData.deliveryAddress;
+      
+      // Get customer details for verification
+      const customerEmailFromEmail = (emailMessage as any).customerEmail;
+      const registeredCustomerEmail = (customer as any).email || customerEmailFromEmail;
+      const registeredCustomerId = customerRef; // Default from email
+      
+      // Override customer reference if found in PDF
+      const customerRefFromPdf = args.pdfShippingData.customerRef;
+      if (customerRefFromPdf) {
+        customerRef = customerRefFromPdf;
+      }
+      
+      // Match delivery address against forwarder warehouses
+      const allForwarders = await ctx.db.query("forwarders").collect();
+      const forwardersWithWarehouses = await Promise.all(
+        allForwarders.map(async (forwarder) => {
+          const warehouses = await ctx.db
+            .query("warehouses")
+            .withIndex("by_forwarder", (q) => q.eq("forwarderId", forwarder._id))
+            .collect();
+          return { ...forwarder, warehouses };
+        })
+      );
+
+      // Find best forwarder match using enhanced verification
+      let bestVerificationResult: VerificationResult & { forwarderId: string; warehouse: any } | null = null;
+      
+      for (const forwarder of forwardersWithWarehouses) {
+        for (const warehouse of forwarder.warehouses) {
+          const warehouseAddress = `${warehouse.address} ${warehouse.city} ${warehouse.country} ${warehouse.postalCode}`;
+          
+          const verification = verifyPackageOwnership(
+            deliveryAddress,
+            warehouseAddress,
+            customerRefFromPdf || null,
+            customerEmailFromEmail,
+            registeredCustomerId,
+            registeredCustomerEmail
+          );
+          
+          if (verification.isHighConfidence || verification.isMediumConfidence) {
+            if (!bestVerificationResult || verification.addressSimilarity > bestVerificationResult.addressSimilarity) {
+              bestVerificationResult = {
+                ...verification,
+                forwarderId: forwarder._id,
+                warehouse
+              };
+            }
+          }
+        }
+      }
+
+      if (bestVerificationResult) {
+        forwarderId = bestVerificationResult.forwarderId;
+        source = "SHIPPING_LABEL";
+        
+        if (bestVerificationResult.isHighConfidence) {
+          confidence = "HIGH";
+          console.log("HIGH confidence ASN created", {
+            forwarderId,
+            deliveryAddress,
+            customerRef,
+            addressSimilarity: bestVerificationResult.addressSimilarity.toFixed(1) + "%",
+            verification: "All criteria met (postal+address+ID+email)"
+          });
+        } else if (bestVerificationResult.isMediumConfidence) {
+          confidence = "MEDIUM";
+          console.log("MEDIUM confidence ASN created", {
+            forwarderId,
+            deliveryAddress,
+            customerRef,
+            addressSimilarity: bestVerificationResult.addressSimilarity.toFixed(1) + "%",
+            verification: "Medium criteria met (80% address match)"
+          });
+        }
+        
+        // Extract estimated delivery if available
+        if (args.pdfShippingData.estimatedDelivery) {
+          estimatedArrival = args.pdfShippingData.estimatedDelivery;
+        }
+      } else {
+        console.log("Verification failed for all forwarders", {
+          deliveryAddress,
+          customerRef: customerRefFromPdf,
+          customerEmail: customerEmailFromEmail,
+          reasons: "No forwarder met HIGH or MEDIUM confidence criteria"
+        });
+      }
+    }
+
+    // SIGNAL 2: Customer behavior pattern analysis (MEDIUM confidence)
+    if (!forwarderId) {
+      // Get customer's recent ASNs to predict forwarder
+      const recentAsns = await ctx.db
+        .query("advanceShipmentNotices")
+        .withIndex("by_customer", (q) => q.eq("customerId", customer._id))
+        .order("desc")
+        .take(10);
+
+      if (recentAsns.length >= 2) {
+        // Count frequency of forwarders
+        const forwarderFreq: { [key: string]: number } = {};
+        recentAsns.forEach(asn => {
+          forwarderFreq[asn.forwarderId] = (forwarderFreq[asn.forwarderId] || 0) + 1;
+        });
+
+        const mostUsed = Object.entries(forwarderFreq)
+          .sort(([,a], [,b]) => b - a)[0];
+
+        if (mostUsed && mostUsed[1] >= 2) {
+          forwarderId = mostUsed[0];
+          confidence = "MEDIUM";
+          source = "EMAIL_ANALYSIS";
+        }
+      }
+    }
+
+    // SIGNAL 3: Default forwarder for customer's country (LOW confidence - skip)
+    // We only create ASNs for HIGH and MEDIUM confidence
+
+    if (forwarderId && confidence && (confidence === "HIGH" || confidence === "MEDIUM")) {
+      // Extract estimated delivery if possible
+      if (args.extractedData.trackingNumbers.length > 0) {
+        // TODO: Query carrier APIs for delivery estimate
+        // For now, estimate 3-5 days from now
+        estimatedArrival = Date.now() + (4 * 24 * 60 * 60 * 1000);
+      }
+
+      // Create ASN
+      const asnId: any = await ctx.runMutation(api.asn.createAdvanceShipmentNotice, {
+        forwarderId,
+        customerId: customer._id,
+        customerRef,
+        trackingNumber: args.extractedData.trackingNumbers[0] || undefined,
+        orderNumbers: args.extractedData.orderNumbers,
+        shopName: args.extractedData.shopName,
+        estimatedArrival: estimatedArrival || undefined,
+        deliveryAddress: deliveryAddress || undefined,
+        confidence,
+        source: source as "SHIPPING_LABEL" | "TRACKING_API" | "MANUAL" | "EMAIL_ANALYSIS",
+        packageDetails: {
+          estimatedValue: args.extractedData.estimatedValue,
+          currency: args.extractedData.currency,
+          weight: args.extractedData.weight,
+          description: `Package from ${args.extractedData.shopName || 'online store'}`,
+        },
+        emailMessageId: args.emailId,
+      });
+
+      return {
+        success: true,
+        asnId,
+        forwarderId,
+        confidence,
+        source,
+        reason: `ASN created with ${confidence} confidence from ${source}`,
+      };
+    }
+
+    // No ASN created - create missing ASN review for customer self-service
+    if (args.extractedData.trackingNumbers.length > 0) {
+      // Only create review if there's a tracking number (shows it's a real shipment)
+      const reviewId: any = await ctx.runMutation(api.asn.createMissingAsnReview, {
+        customerId: customer._id,
+        emailMessageId: args.emailId,
+        emailSubject: args.emailData.subject,
+        trackingNumbers: args.extractedData.trackingNumbers,
+        shopName: args.extractedData.shopName,
+        emailReceivedAt: (emailMessage as any).receivedAt,
+        suggestedForwarder: forwarderId || undefined, // convert null to undefined
+        suggestedReason: forwarderId ? "Based on previous shipping patterns" : undefined,
+      });
+
+      return {
+        success: false,
+        missingAsnReviewId: reviewId,
+        reason: "No high/medium confidence signals found - created review for manual action",
+      };
+    }
+
+    return {
+      success: false,
+      reason: "No tracking number found - not a shipping confirmation",
+    };
+  },
+});

@@ -9,6 +9,143 @@ export const getOrder = query({
   },
 });
 
+// Get orders for a customer with email matching data
+export const getCustomerOrders = query({
+  args: { 
+    customerId: v.optional(v.string()),
+    limit: v.optional(v.number()),
+    offset: v.optional(v.number()),
+  },
+  handler: async (ctx, { customerId, limit = 50, offset = 0 }) => {
+    // Get authenticated user if no customerId provided
+    if (!customerId) {
+      const identity = await ctx.auth.getUserIdentity();
+      if (!identity) return { orders: [], total: 0, hasMore: false };
+      
+      const customer = await ctx.db
+        .query("users")
+        .withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.subject))
+        .unique();
+      
+      if (!customer || customer.role !== "customer") {
+        return { orders: [], total: 0, hasMore: false };
+      }
+      
+      customerId = customer._id;
+    }
+
+    // Get orders for this customer
+    const orders = await ctx.db
+      .query("orders")
+      .withIndex("by_customer", (q) => q.eq("customerId", customerId))
+      .order("desc")
+      .collect();
+
+    // Get email messages for tracking number/merchant matching
+    const emailMessages = await ctx.db
+      .query("emailMessages")
+      .withIndex("by_customer", (q) => q.eq("customerId", customerId))
+      .collect();
+
+    // Enhance orders with email data and proper categorization
+    const enhancedOrders = await Promise.all(
+      orders.map(async (order) => {
+        // Find matching email for this order
+        const matchingEmail = emailMessages.find(email => 
+          email.matchedOrderId === order._id ||
+          email.extractedData.trackingNumbers.some(tn => tn === order.trackingNumber)
+        );
+
+        // Determine item category from email or set to "-"
+        let itemCategory = "-";
+        if (matchingEmail && matchingEmail.extractedData) {
+          // Simple category inference based on shop name and extracted data
+          const shopName = matchingEmail.extractedData.shopName?.toLowerCase() || "";
+          if (shopName.includes("amazon") || shopName.includes("electronics")) {
+            itemCategory = "Electronics";
+          } else if (shopName.includes("nike") || shopName.includes("adidas") || shopName.includes("fashion")) {
+            itemCategory = "Clothing & Accessories";
+          } else if (shopName.includes("book")) {
+            itemCategory = "Books & Media";
+          } else if (matchingEmail.extractedData.shopName) {
+            itemCategory = "General Merchandise";
+          }
+        }
+
+        // Get warehouse details
+        const warehouse = await ctx.db.get(order.warehouseId as any);
+        const forwarder = await ctx.db.get(order.forwarderId as any);
+
+        // Determine courier tracking number vs internal order ID
+        const hasShipped = order.status === "in_transit" || order.status === "delivered";
+        const courierTrackingNumber = hasShipped ? (order as any).courierTrackingNumber || "-" : "-";
+
+        return {
+          // Order identification
+          _id: order._id,
+          orderNumber: order._id, // Internal order ID
+          trackingNumber: order.trackingNumber, // Internal tracking until shipped
+          courierTrackingNumber, // Actual courier tracking (only when shipped)
+          
+          // Basic info
+          merchantName: order.merchantName,
+          status: order.status,
+          
+          // Package details from email or manual input
+          itemCategory,
+          declaredWeight: order.declaredWeight || null,
+          declaredValue: order.declaredValue || null,
+          currency: order.currency || "USD",
+          
+          // Enhanced with email data
+          emailData: matchingEmail ? {
+            shopName: matchingEmail.extractedData.shopName,
+            estimatedValue: matchingEmail.extractedData.estimatedValue,
+            currency: matchingEmail.extractedData.currency,
+            weight: matchingEmail.extractedData.weight,
+          } : null,
+          
+          // Location and service
+          warehouse: warehouse ? {
+            name: (warehouse as any).name,
+            city: (warehouse as any).city,
+            country: (warehouse as any).country,
+          } : null,
+          forwarder: forwarder ? {
+            businessName: (forwarder as any).businessName,
+          } : null,
+          
+          // Courier info
+          courier: order.courier || "-",
+          shippingType: order.shippingType,
+          
+          // Timestamps
+          createdAt: order.createdAt,
+          receivedAt: (order as any).receivedAt,
+          shippedAt: (order as any).shippedAt,
+          deliveredAt: (order as any).deliveredAt,
+          
+          // Destination
+          shippingAddress: order.shippingAddress,
+        };
+      })
+    );
+
+    // Sort by creation time (newest first)
+    enhancedOrders.sort((a, b) => b.createdAt - a.createdAt);
+
+    // Apply pagination
+    const total = enhancedOrders.length;
+    const paginatedOrders = enhancedOrders.slice(offset, offset + limit);
+
+    return {
+      orders: paginatedOrders,
+      total,
+      hasMore: (offset + limit) < total,
+    };
+  },
+});
+
 // Get orders for a forwarder with filtering and pagination
 export const getForwarderOrders = query({
   args: { 

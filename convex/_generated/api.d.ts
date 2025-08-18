@@ -14,12 +14,10 @@ import type {
   FunctionReference,
 } from "convex/server";
 import type * as analytics from "../analytics.js";
-import type * as asn from "../asn.js";
 import type * as cleanupUser from "../cleanupUser.js";
 import type * as courierIntegrations from "../courierIntegrations.js";
 import type * as customerDashboard from "../customerDashboard.js";
 import type * as customerOrders from "../customerOrders.js";
-import type * as emailMatching from "../emailMatching.js";
 import type * as emails from "../emails.js";
 import type * as files from "../files.js";
 import type * as fixUserRole from "../fixUserRole.js";
@@ -34,6 +32,7 @@ import type * as orders from "../orders.js";
 import type * as parcelConditions from "../parcelConditions.js";
 import type * as seedTestData from "../seedTestData.js";
 import type * as staff from "../staff.js";
+import type * as stripe from "../stripe.js";
 import type * as subscriptions from "../subscriptions.js";
 import type * as users from "../users.js";
 import type * as utils_locationTimezone from "../utils/locationTimezone.js";
@@ -52,12 +51,10 @@ import type * as warehouses from "../warehouses.js";
  */
 declare const fullApi: ApiFromModules<{
   analytics: typeof analytics;
-  asn: typeof asn;
   cleanupUser: typeof cleanupUser;
   courierIntegrations: typeof courierIntegrations;
   customerDashboard: typeof customerDashboard;
   customerOrders: typeof customerOrders;
-  emailMatching: typeof emailMatching;
   emails: typeof emails;
   files: typeof files;
   fixUserRole: typeof fixUserRole;
@@ -72,6 +69,7 @@ declare const fullApi: ApiFromModules<{
   parcelConditions: typeof parcelConditions;
   seedTestData: typeof seedTestData;
   staff: typeof staff;
+  stripe: typeof stripe;
   subscriptions: typeof subscriptions;
   users: typeof users;
   "utils/locationTimezone": typeof utils_locationTimezone;

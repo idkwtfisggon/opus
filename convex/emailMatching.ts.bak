@@ -1,0 +1,226 @@
+import { mutation, query } from "./_generated/server";
+import { v } from "convex/values";
+
+// Future: Store purchase data from browser extension
+export const capturePurchase = mutation({
+  args: {
+    customerId: v.string(),
+    customerEmail: v.string(),
+    shopName: v.string(),
+    shopDomain: v.string(),
+    orderNumber: v.optional(v.string()),
+    orderValue: v.optional(v.number()),
+    currency: v.optional(v.string()),
+    userAgent: v.optional(v.string()),
+    pageUrl: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const captureId = await ctx.db.insert("purchaseCaptures", {
+      ...args,
+      capturedAt: Date.now(),
+      isMatched: false,
+    });
+
+    console.log("Captured purchase from browser extension:", {
+      captureId,
+      shopName: args.shopName,
+      orderNumber: args.orderNumber,
+    });
+
+    return captureId;
+  },
+});
+
+// Match incoming email to captured purchase data
+export const matchEmailToPurchase = mutation({
+  args: {
+    emailId: v.string(),
+    extractedOrderNumbers: v.array(v.string()),
+    extractedShopName: v.optional(v.string()),
+    customerEmail: v.string(),
+    emailReceivedAt: v.number(),
+  },
+  handler: async (ctx, args) => {
+    // Find potential purchase matches
+    const potentialMatches: Array<{
+      capture: any;
+      matchScore: number;
+      matchReasons: string[];
+    }> = [];
+
+    // Get recent purchases for this customer (last 7 days)
+    const recentCaptures = await ctx.db
+      .query("purchaseCaptures")
+      .withIndex("by_email", (q) => q.eq("customerEmail", args.customerEmail))
+      .filter((q) => 
+        q.and(
+          q.gte(q.field("capturedAt"), args.emailReceivedAt - (7 * 24 * 60 * 60 * 1000)),
+          q.eq(q.field("isMatched"), false)
+        )
+      )
+      .collect();
+
+    for (const capture of recentCaptures) {
+      let matchScore = 0;
+      const matchReasons: string[] = [];
+
+      // 1. Order number exact match (highest priority)
+      if (capture.orderNumber && args.extractedOrderNumbers.includes(capture.orderNumber)) {
+        matchScore += 100;
+        matchReasons.push(`Order number match: ${capture.orderNumber}`);
+      }
+
+      // 2. Shop name similarity
+      if (args.extractedShopName && capture.shopName) {
+        const shopSimilarity = calculateShopNameSimilarity(args.extractedShopName, capture.shopName);
+        if (shopSimilarity > 0.8) {
+          matchScore += 50;
+          matchReasons.push(`Shop name match: ${args.extractedShopName} ≈ ${capture.shopName}`);
+        } else if (shopSimilarity > 0.6) {
+          matchScore += 25;
+          matchReasons.push(`Partial shop name match: ${args.extractedShopName} ≈ ${capture.shopName}`);
+        }
+      }
+
+      // 3. Timeline proximity (email should come 0-72h after purchase)
+      const timeDiff = args.emailReceivedAt - capture.capturedAt;
+      if (timeDiff >= 0 && timeDiff <= (72 * 60 * 60 * 1000)) { // 0-72 hours
+        matchScore += 20;
+        matchReasons.push(`Timeline match: ${Math.round(timeDiff / (60 * 60 * 1000))}h after purchase`);
+      }
+
+      // 4. Domain consistency check
+      if (args.extractedShopName && capture.shopDomain) {
+        const domainName = capture.shopDomain.split('.')[0].toLowerCase();
+        const shopNameWords = args.extractedShopName.toLowerCase().split(' ');
+        
+        if (shopNameWords.some(word => domainName.includes(word) || word.includes(domainName))) {
+          matchScore += 10;
+          matchReasons.push(`Domain consistency: ${domainName} matches shop name`);
+        }
+      }
+
+      if (matchScore >= 50) { // Minimum threshold for consideration
+        potentialMatches.push({
+          capture,
+          matchScore,
+          matchReasons,
+        });
+      }
+    }
+
+    // Sort by match score and take the best match
+    potentialMatches.sort((a, b) => b.matchScore - a.matchScore);
+    const bestMatch = potentialMatches[0];
+
+    if (bestMatch && bestMatch.matchScore >= 100) {
+      // High confidence match - update both records
+      await ctx.db.patch(bestMatch.capture._id, {
+        isMatched: true,
+        matchedEmailId: args.emailId,
+      });
+
+      await ctx.db.patch(args.emailId as any, {
+        matchedOrderId: bestMatch.capture._id,
+        // Note: We'll update the extractedData.shopName via the email processing result
+      });
+
+      console.log("Successfully matched email to purchase:", {
+        emailId: args.emailId,
+        captureId: bestMatch.capture._id,
+        matchScore: bestMatch.matchScore,
+        matchReasons: bestMatch.matchReasons,
+        shopName: bestMatch.capture.shopName,
+      });
+
+      return {
+        success: true,
+        matchedCaptureId: bestMatch.capture._id,
+        matchScore: bestMatch.matchScore,
+        matchReasons: bestMatch.matchReasons,
+        shopName: bestMatch.capture.shopName,
+      };
+    }
+
+    console.log("No high-confidence purchase match found for email:", {
+      emailId: args.emailId,
+      potentialMatches: potentialMatches.length,
+      bestScore: bestMatch?.matchScore || 0,
+    });
+
+    return {
+      success: false,
+      potentialMatches: potentialMatches.slice(0, 3), // Return top 3 for debugging
+    };
+  },
+});
+
+// Calculate similarity between shop names
+function calculateShopNameSimilarity(name1: string, name2: string): number {
+  const normalize = (name: string) => name
+    .toLowerCase()
+    .replace(/\b(inc|ltd|llc|corp|company|store|shop|boutique|online|official)\b/g, '')
+    .replace(/[^\w\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const normalized1 = normalize(name1);
+  const normalized2 = normalize(name2);
+
+  // Exact match
+  if (normalized1 === normalized2) return 1.0;
+
+  // Word-based comparison
+  const words1 = normalized1.split(' ').filter(w => w.length > 2);
+  const words2 = normalized2.split(' ').filter(w => w.length > 2);
+
+  if (words1.length === 0 || words2.length === 0) return 0;
+
+  let matchingWords = 0;
+  for (const word1 of words1) {
+    if (words2.some(word2 => word1.includes(word2) || word2.includes(word1))) {
+      matchingWords++;
+    }
+  }
+
+  return matchingWords / Math.max(words1.length, words2.length);
+}
+
+// Get unmatched purchases for a customer
+export const getUnmatchedPurchases = query({
+  args: {
+    customerId: v.string(),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, { customerId, limit = 10 }) => {
+    return await ctx.db
+      .query("purchaseCaptures")
+      .withIndex("by_customer", (q) => q.eq("customerId", customerId))
+      .filter((q) => q.eq(q.field("isMatched"), false))
+      .order("desc")
+      .take(limit);
+  },
+});
+
+// Get purchase statistics for a customer
+export const getPurchaseStats = query({
+  args: {
+    customerId: v.string(),
+  },
+  handler: async (ctx, { customerId }) => {
+    const allCaptures = await ctx.db
+      .query("purchaseCaptures")
+      .withIndex("by_customer", (q) => q.eq("customerId", customerId))
+      .collect();
+
+    const matchedCaptures = allCaptures.filter(c => c.isMatched);
+    const unmatchedCaptures = allCaptures.filter(c => !c.isMatched);
+
+    return {
+      totalPurchases: allCaptures.length,
+      matchedPurchases: matchedCaptures.length,
+      unmatchedPurchases: unmatchedCaptures.length,
+      matchRate: allCaptures.length > 0 ? (matchedCaptures.length / allCaptures.length) * 100 : 0,
+    };
+  },
+});

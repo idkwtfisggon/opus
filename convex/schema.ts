@@ -49,6 +49,10 @@ export default defineSchema({
     twoFactorEnabled: v.optional(v.boolean()),
     lastLoginAt: v.optional(v.number()),
     
+    // Stripe integration
+    stripeCustomerId: v.optional(v.string()),
+    defaultPaymentMethodId: v.optional(v.string()),
+    
     createdAt: v.number(),
     updatedAt: v.optional(v.number()),
   }).index("by_token", ["tokenIdentifier"])

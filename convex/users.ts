@@ -18,6 +18,30 @@ export const findUserByToken = query({
   },
 });
 
+export const getUserByToken = query({
+  args: { tokenIdentifier: v.string() },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_token", (q) => q.eq("tokenIdentifier", args.tokenIdentifier))
+      .unique();
+    return user;
+  },
+});
+
+export const updateUser = mutation({
+  args: { 
+    userId: v.id("users"), 
+    updates: v.object({
+      stripeCustomerId: v.optional(v.string()),
+      defaultPaymentMethodId: v.optional(v.string()),
+    })
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.userId, args.updates);
+  },
+});
+
 export const upsertUser = mutation({
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
