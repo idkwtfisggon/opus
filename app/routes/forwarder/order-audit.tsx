@@ -3,6 +3,7 @@ import { fetchQuery } from "convex/nextjs";
 import { api } from "../../../convex/_generated/api";
 import { useQuery } from "convex/react";
 import { useState } from "react";
+import { User, Building, Settings, HelpCircle } from "lucide-react";
 
 export async function loader(args: any) {
   const { userId } = await getAuth(args);
@@ -67,10 +68,10 @@ export default function OrderAuditPage({ loaderData }: any) {
 
   const getChangeTypeIcon = (type: string) => {
     switch (type) {
-      case 'staff': return '👤';
-      case 'forwarder': return '🏢';
-      case 'system': return '⚙️';
-      default: return '❓';
+      case 'staff': return <User className="w-4 h-4" />;
+      case 'forwarder': return <Building className="w-4 h-4" />;
+      case 'system': return <Settings className="w-4 h-4" />;
+      default: return <HelpCircle className="w-4 h-4" />;
     }
   };
 

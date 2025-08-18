@@ -9,22 +9,22 @@ import { useAuth } from "@clerk/react-router";
 export async function loader(args: Route.LoaderArgs) {
   const { userId } = await getAuth(args);
   
-  console.log("🔍 FORWARDER LAYOUT LOADER - userId:", userId);
+  console.log("FORWARDER LAYOUT LOADER - userId:", userId);
   
   if (!userId) {
-    console.log("❌ No userId - redirecting to sign-in");
+    console.log("No userId - redirecting to sign-in");
     return redirect("/sign-in");
   }
 
   try {
-    console.log("🔍 Attempting to fetch forwarder for userId:", userId);
-    console.log("🔍 Available forwarders in DB:");
+    console.log("Attempting to fetch forwarder for userId:", userId);
+    console.log("Available forwarders in DB:");
     console.log("  - user_30t46oUNZB9yniLtgUDOcqa9sCS (benongyr@gmail.com)");
     console.log("  - user_311q2JRtxFvJwOm8pKvTsojKrb3 (aredsnuff@gmail.com)");
     
     const existingForwarder = await fetchQuery(api.forwarders.getForwarderByUserId, { userId });
     
-    console.log("🔍 Forwarder query result:", existingForwarder);
+    console.log("Forwarder query result:", existingForwarder);
     
     if (existingForwarder) {
       console.log("✅ Found existing forwarder for userId:", userId);

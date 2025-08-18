@@ -3,6 +3,7 @@ import { fetchQuery } from "convex/nextjs";
 import { api } from "../../../convex/_generated/api";
 import { useQuery } from "convex/react";
 import { useState } from "react";
+import { Package, Search, Printer, Target, Tag, Smartphone } from "lucide-react";
 
 export async function loader(args: any) {
   const { userId } = await getAuth(args);
@@ -120,9 +121,10 @@ export default function ForwarderQRGenerator({ loaderData }: any) {
                 <button
                   onClick={() => generateQR(selectedTrackingNumber)}
                   disabled={!selectedTrackingNumber}
-                  className="w-full bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  📦 Generate QR Code
+                  <Package className="w-4 h-4" />
+                  Generate QR Code
                 </button>
               </div>
             </div>
@@ -151,9 +153,10 @@ export default function ForwarderQRGenerator({ loaderData }: any) {
               <button
                 onClick={() => generateQR(customTrackingNumber)}
                 disabled={!customTrackingNumber}
-                className="w-full bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                📦 Generate QR Code
+                <Package className="w-4 h-4" />
+                Generate QR Code
               </button>
             </div>
           </div>
@@ -182,13 +185,15 @@ export default function ForwarderQRGenerator({ loaderData }: any) {
                     target="_blank"
                     className="inline-block bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
                   >
-                    🔍 Test with Staff Scanner
+                    <Search className="w-4 h-4 mr-2" />
+                    Test with Staff Scanner
                   </a>
                   <button
                     onClick={() => window.print()}
                     className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
                   >
-                    🖨️ Print QR Code
+                    <Printer className="w-4 h-4 mr-2" />
+                    Print QR Code
                   </button>
                 </div>
               </div>
@@ -201,16 +206,25 @@ export default function ForwarderQRGenerator({ loaderData }: any) {
           <h3 className="font-semibold text-blue-800 mb-3">How QR Codes Work</h3>
           <div className="space-y-3 text-sm text-blue-700">
             <div>
-              <strong>📦 One QR Code per Order:</strong> Same format as print labels - contains order ID, tracking number, and courier
+              <div className="flex items-start gap-2 mb-2">
+                <Package className="w-4 h-4 mt-0.5 text-blue-600" />
+                <div><strong>One QR Code per Order:</strong> Same format as print labels - contains order ID, tracking number, and courier</div>
+              </div>
             </div>
             <div>
-              <strong>🏷️ Print Labels:</strong> QR codes generated here match exactly with shipping label QR codes
+              <div className="flex items-start gap-2 mb-2">
+                <Tag className="w-4 h-4 mt-0.5 text-green-600" />
+                <div><strong>Print Labels:</strong> QR codes generated here match exactly with shipping label QR codes</div>
+              </div>
             </div>
             <div>
-              <strong>📱 Staff Scanning:</strong> Staff can scan any QR code (from labels or generated here) to update order status
+              <strong><Smartphone className="w-4 h-4 inline mr-1" /> Staff Scanning:</strong> Staff can scan any QR code (from labels or generated here) to update order status
             </div>
             <div>
-              <strong>🎯 Mobile Testing:</strong> Use your phone to scan QR codes displayed on this screen
+              <div className="flex items-start gap-2">
+                <Target className="w-4 h-4 mt-0.5 text-purple-600" />
+                <div><strong>Mobile Testing:</strong> Use your phone to scan QR codes displayed on this screen</div>
+              </div>
             </div>
           </div>
         </div>

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useMutation } from "convex/react";
-import { CheckCircle, Building, MapPin, Phone, Mail, ArrowRight, ArrowLeft, AlertCircle, Info } from "lucide-react";
+import { CheckCircle, Building, MapPin, Phone, Mail, ArrowRight, ArrowLeft, AlertCircle, Info, Search, PenTool } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
@@ -375,7 +375,8 @@ export default function ForwarderOnboarding({ userId, onComplete }: ForwarderOnb
                           : 'bg-muted text-muted-foreground hover:bg-muted/80'
                       }`}
                     >
-                      🔍 Smart Search
+                      <Search className="w-3 h-3 mr-1" />
+                      Smart Search
                     </button>
                     <button
                       type="button"
@@ -386,7 +387,8 @@ export default function ForwarderOnboarding({ userId, onComplete }: ForwarderOnb
                           : 'bg-muted text-muted-foreground hover:bg-muted/80'
                       }`}
                     >
-                      ✏️ Manual Entry
+                      <PenTool className="w-3 h-3 mr-1" />
+                      Manual Entry
                     </button>
                   </div>
                 </div>

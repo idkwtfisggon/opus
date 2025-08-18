@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import DualCameraCapture from "./DualCameraCapture";
+import { Eye, ClipboardList } from "lucide-react";
 
 interface ArrivalCaptureProps {
   orderId: string;
@@ -335,9 +336,13 @@ export default function ArrivalCapture({ orderId, onComplete, onCancel }: Arriva
 
               {/* Manual Damage Assessment */}
               <div>
-                <div className="text-sm font-medium text-gray-700 mb-2">👀 Damage Assessment</div>
-                <div className="text-sm text-blue-600">
-                  📋 Manual assessment required - complete below
+                <div className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                  <Eye className="w-4 h-4" />
+                  Damage Assessment
+                </div>
+                <div className="text-sm text-blue-600 flex items-center gap-2">
+                  <ClipboardList className="w-4 h-4" />
+                  Manual assessment required - complete below
                 </div>
               </div>
 

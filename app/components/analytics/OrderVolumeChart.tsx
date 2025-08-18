@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
+import { BarChart3 } from "lucide-react";
 
 interface OrderVolumeChartProps {
   forwarderId: string;
@@ -48,7 +49,10 @@ export default function OrderVolumeChart({ forwarderId }: OrderVolumeChartProps)
       <div className="bg-card border border-border rounded-xl p-6">
         <h2 className="text-xl font-semibold text-foreground mb-4">Order Volume</h2>
         <div className="text-center py-12 border-2 border-dashed border-border rounded-lg">
-          <div className="text-muted-foreground mb-2">📊 No daily volume data</div>
+          <div className="flex items-center justify-center gap-2 text-muted-foreground mb-2">
+            <BarChart3 className="w-5 h-5" />
+            <span>No daily volume data</span>
+          </div>
           <div className="text-sm text-muted-foreground">Analytics returned empty dailyVolume array</div>
           <div className="text-xs text-muted-foreground mt-2">Forwarder: {forwarderId}</div>
         </div>

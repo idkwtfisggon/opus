@@ -4,6 +4,7 @@ import type { Route } from "./+types/orders";
 import { api } from "../../../convex/_generated/api";
 import { useMutation, useQuery } from "convex/react";
 import { useState } from "react";
+import { Truck, Trash2 } from "lucide-react";
 import ShippingRatesModal from "../../components/courier/ShippingRatesModal";
 
 export async function loader(args: Route.LoaderArgs) {
@@ -703,7 +704,7 @@ export default function ManageOrders({ loaderData }: Route.ComponentProps) {
                           className="bg-red-100 text-red-800 px-3 py-1 rounded-md text-sm font-medium hover:bg-red-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           title="Delete this order permanently"
                         >
-                          {deletingOrderId === order._id ? "..." : "🗑"}
+                          {deletingOrderId === order._id ? "..." : <Trash2 className="w-4 h-4" />}
                         </button>
                         
                         {/* Smart Actions based on order state - Customer pre-assigns courier */}
@@ -742,7 +743,8 @@ export default function ManageOrders({ loaderData }: Route.ComponentProps) {
                             }}
                             className="bg-primary text-primary-foreground px-3 py-1 rounded-md text-sm font-medium hover:bg-primary/90 transition-colors"
                           >
-                            🚚 Create Label
+                            <Truck className="w-4 h-4 mr-2" />
+                            Create Label
                           </button>
                         ) : order.status === 'incoming' ? (
                           <button 

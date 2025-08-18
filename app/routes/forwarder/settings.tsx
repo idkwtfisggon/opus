@@ -7,6 +7,7 @@ import { useState, useEffect } from "react";
 import { countryZoneList, getCountryCodesForZone, getAllCountries } from "../../utils/countryZones";
 import ParcelLimitSettings from "../../components/settings/ParcelLimitSettings";
 import OperatingHoursSettings from "../../components/settings/OperatingHoursSettings";
+import { Zap, Lightbulb, AlertTriangle, Search, Signature, MapPin, Shield } from "lucide-react";
 
 export async function loader(args: Route.LoaderArgs) {
   const { userId } = await getAuth(args);
@@ -529,7 +530,8 @@ export default function ForwarderSettings({ loaderData }: Route.ComponentProps) 
                     onClick={() => setShowPresetZones(true)}
                     className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-medium shadow-sm transition-all"
                   >
-                    ⚡ Quick Setup
+                    <Zap className="w-4 h-4 mr-2" />
+                    Quick Setup
                   </button>
                   <button
                     onClick={() => setIsAddingZone(true)}
@@ -596,7 +598,7 @@ export default function ForwarderSettings({ loaderData }: Route.ComponentProps) 
                   
                   <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                     <div className="flex items-start gap-3">
-                      <div className="text-blue-600 mt-0.5">💡</div>
+                      <Lightbulb className="w-4 h-4 text-blue-600 mt-0.5" />
                       <div>
                         <p className="text-sm font-medium text-blue-900">Pro Tip</p>
                         <p className="text-xs text-blue-700 mt-1">
@@ -640,7 +642,7 @@ export default function ForwarderSettings({ loaderData }: Route.ComponentProps) 
                           return (
                             <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
                               <div className="flex items-start gap-2">
-                                <div className="text-red-600 mt-0.5">⚠️</div>
+                                <AlertTriangle className="w-4 h-4 text-red-600 mt-0.5" />
                                 <div className="flex-1">
                                   <h4 className="text-sm font-medium text-red-900">Country Conflicts Detected</h4>
                                   <div className="text-xs text-red-700 mt-1 space-y-1">
@@ -744,7 +746,7 @@ export default function ForwarderSettings({ loaderData }: Route.ComponentProps) 
                                       </span>
                                       {hasConflict && (
                                         <span className="text-xs bg-red-100 text-red-800 px-1 py-0.5 rounded">
-                                          ⚠️ In "{hasConflict}"
+                                          <AlertTriangle className="w-4 h-4 mr-1" /> In "{hasConflict}"
                                         </span>
                                       )}
                                     </div>
@@ -914,7 +916,7 @@ export default function ForwarderSettings({ loaderData }: Route.ComponentProps) 
                       }}
                     />
                     <div className="absolute right-3 top-2 text-xs text-muted-foreground">
-                      🔍
+                      <Search className="w-4 h-4" />
                     </div>
                   </div>
                 </div>
@@ -1102,7 +1104,7 @@ export default function ForwarderSettings({ loaderData }: Route.ComponentProps) 
                   ) && (
                     <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
                       <div className="flex items-start gap-3">
-                        <div className="text-red-600 mt-0.5">⚠️</div>
+                        <AlertTriangle className="w-4 h-4 text-red-600 mt-0.5" />
                         <div>
                           <p className="text-sm font-medium text-red-900">Duplicate Configuration</p>
                           <p className="text-xs text-red-700 mt-1">
@@ -1459,13 +1461,13 @@ export default function ForwarderSettings({ loaderData }: Route.ComponentProps) 
                           {(rate.requiresSignature || rate.trackingIncluded || rate.insuranceIncluded) && (
                             <div className="flex gap-2 mt-2">
                               {rate.requiresSignature && (
-                                <span className="text-xs bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded border border-indigo-200">✍️ Signature Required</span>
+                                <span className="text-xs bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded border border-indigo-200 flex items-center gap-1"><Signature className="w-3 h-3" /> Signature Required</span>
                               )}
                               {rate.trackingIncluded && (
-                                <span className="text-xs bg-teal-100 text-teal-800 px-2 py-0.5 rounded border border-teal-200">📍 Tracking</span>
+                                <span className="text-xs bg-teal-100 text-teal-800 px-2 py-0.5 rounded border border-teal-200 flex items-center gap-1"><MapPin className="w-3 h-3" /> Tracking</span>
                               )}
                               {rate.insuranceIncluded && (
-                                <span className="text-xs bg-violet-100 text-violet-800 px-2 py-0.5 rounded border border-violet-200">🛡️ Insurance</span>
+                                <span className="text-xs bg-violet-100 text-violet-800 px-2 py-0.5 rounded border border-violet-200 flex items-center gap-1"><Shield className="w-3 h-3" /> Insurance</span>
                               )}
                             </div>
                           )}

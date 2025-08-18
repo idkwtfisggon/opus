@@ -4,6 +4,7 @@ import { api } from "../../../convex/_generated/api";
 import { useQuery, useMutation } from "convex/react";
 import { useState, useRef, useEffect } from "react";
 import BarcodeScanner from "../../components/scanner/BarcodeScanner";
+import { Package, QrCode, BarChart3, Users, TrendingUp } from "lucide-react";
 
 export async function loader(args: any) {
   const { userId } = await getAuth(args);
@@ -318,16 +319,20 @@ export default function ForwarderScanner({ loaderData }: any) {
           <h3 className="font-medium text-foreground mb-4">Quick Actions</h3>
           <div className="grid grid-cols-2 gap-3">
             <a href="/forwarder/orders" className="p-3 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-100 transition-colors text-center">
-              📦 View All Orders
+              <Package className="w-4 h-4 mr-2" />
+              View All Orders
             </a>
             <a href="/forwarder/qr-generator" className="p-3 bg-green-50 text-green-700 rounded-lg text-sm font-medium hover:bg-green-100 transition-colors text-center">
-              🏷️ Generate QR Codes
+              <QrCode className="w-4 h-4 mr-2" />
+              Generate QR Codes
             </a>
             <a href="/forwarder/staff" className="p-3 bg-purple-50 text-purple-700 rounded-lg text-sm font-medium hover:bg-purple-100 transition-colors text-center">
-              👥 Manage Staff
+              <Users className="w-4 h-4 mr-2" />
+              Manage Staff
             </a>
             <a href="/forwarder/analytics" className="p-3 bg-orange-50 text-orange-700 rounded-lg text-sm font-medium hover:bg-orange-100 transition-colors text-center">
-              📊 View Analytics
+              <BarChart3 className="w-4 h-4 mr-2" />
+              View Analytics
             </a>
           </div>
         </div>

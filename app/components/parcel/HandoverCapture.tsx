@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import DualCameraCapture from "./DualCameraCapture";
+import { AlertTriangle } from "lucide-react";
 
 interface HandoverCaptureProps {
   orderId: string;
@@ -176,7 +177,7 @@ export default function HandoverCapture({ orderId, onComplete, onCancel }: Hando
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
         <div className="bg-white rounded-xl max-w-md w-full p-6">
           <div className="text-center">
-            <div className="text-yellow-500 text-4xl mb-4">⚠️</div>
+            <AlertTriangle className="w-12 h-12 text-yellow-500 mx-auto mb-4" />
             <h2 className="text-lg font-semibold text-gray-900 mb-2">
               No Arrival Record Found
             </h2>

@@ -3,6 +3,7 @@ import { fetchQuery } from "convex/nextjs";
 import { api } from "../../../convex/_generated/api";
 import { useQuery, useMutation } from "convex/react";
 import { useState } from "react";
+import { Package, Plane, Truck, Settings, HelpCircle, Rocket } from "lucide-react";
 
 export async function loader(args: any) {
   const { userId } = await getAuth(args);
@@ -32,7 +33,7 @@ export async function loader(args: any) {
 const SUPPORTED_COURIERS = [
   {
     name: "DHL",
-    logo: "🚚",
+    logo: <Truck className="w-6 h-6" />,
     description: "Global express delivery and logistics",
     apiDocUrl: "https://developer.dhl.com/",
     fields: [
@@ -44,7 +45,7 @@ const SUPPORTED_COURIERS = [
   },
   {
     name: "UPS",
-    logo: "📦",
+    logo: <Package className="w-6 h-6" />,
     description: "Worldwide package delivery and supply chain",
     apiDocUrl: "https://developer.ups.com/",
     fields: [
@@ -55,7 +56,7 @@ const SUPPORTED_COURIERS = [
   },
   {
     name: "FedEx",
-    logo: "✈️",
+    logo: <Plane className="w-6 h-6" />,
     description: "Express transportation and business services",
     apiDocUrl: "https://developer.fedex.com/",
     fields: [
@@ -67,7 +68,7 @@ const SUPPORTED_COURIERS = [
   },
   {
     name: "SF Express",
-    logo: "🚐",
+    logo: <Truck className="w-6 h-6" />,
     description: "Leading logistics service provider in Asia",
     apiDocUrl: "https://open.sf-express.com/",
     fields: [
@@ -122,7 +123,7 @@ export default function CourierIntegrations({ loaderData }: any) {
       case "ready": return "✅";
       case "testing": return "⏳";
       case "error": return "❌";
-      default: return "⚙️";
+      default: return <Settings className="w-4 h-4" />;
     }
   };
 
@@ -480,7 +481,10 @@ export default function CourierIntegrations({ loaderData }: any) {
 
         {/* Info Section */}
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
-          <h3 className="font-semibold text-blue-800 mb-3">🚀 Getting Started</h3>
+          <div className="flex items-center gap-2 mb-3">
+            <Rocket className="w-5 h-5 text-blue-600" />
+            <h3 className="font-semibold text-blue-800">Getting Started</h3>
+          </div>
           <div className="space-y-3 text-sm text-blue-700">
             <div>
               <strong>API Mode:</strong> Connect your carrier account for full automation - rates, labels, and tracking updates.

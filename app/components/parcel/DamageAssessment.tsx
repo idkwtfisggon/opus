@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { AlertTriangle, Check, X, FileText, Droplets, Package, Edit, Circle, Unlock, HelpCircle } from "lucide-react";
 
 interface DamageAssessmentProps {
   aiSuggestions: {
@@ -19,14 +20,14 @@ interface DamageAssessmentProps {
 }
 
 const DAMAGE_TYPES = [
-  { id: "dent", label: "Dent", icon: "⚪" },
-  { id: "tear", label: "Tear", icon: "📄" },
-  { id: "wet", label: "Water Damage", icon: "💧" },
-  { id: "crushed_corner", label: "Crushed Corner", icon: "📦" },
-  { id: "scratches", label: "Scratches", icon: "✏️" },
-  { id: "stains", label: "Stains", icon: "🟤" },
-  { id: "broken_seal", label: "Broken Seal", icon: "🔓" },
-  { id: "other", label: "Other", icon: "❓" },
+  { id: "dent", label: "Dent", icon: <Circle className="w-4 h-4" /> },
+  { id: "tear", label: "Tear", icon: <FileText className="w-4 h-4" /> },
+  { id: "wet", label: "Water Damage", icon: <Droplets className="w-4 h-4" /> },
+  { id: "crushed_corner", label: "Crushed Corner", icon: <Package className="w-4 h-4" /> },
+  { id: "scratches", label: "Scratches", icon: <Edit className="w-4 h-4" /> },
+  { id: "stains", label: "Stains", icon: <Circle className="w-4 h-4 fill-current" /> },
+  { id: "broken_seal", label: "Broken Seal", icon: <Unlock className="w-4 h-4" /> },
+  { id: "other", label: "Other", icon: <HelpCircle className="w-4 h-4" /> },
 ];
 
 export default function DamageAssessment({ aiSuggestions, onConfirm, onCancel }: DamageAssessmentProps) {

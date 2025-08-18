@@ -4,6 +4,7 @@ import { api } from "../../../convex/_generated/api";
 import { useQuery, useMutation } from "convex/react";
 import { useState, useRef, useEffect } from "react";
 import BarcodeScanner from "../../components/scanner/BarcodeScanner";
+import { Search, Package, Tag, User, Building, BarChart3, CheckCircle, XCircle, Globe, Settings } from "lucide-react";
 
 export async function loader(args: any) {
   const { userId } = await getAuth(args);
@@ -149,7 +150,7 @@ export default function StaffScanner({ loaderData }: any) {
       setShowStatusModal(true);
     } else {
       // Debug info
-      console.log("🔍 Scan Debug Info:");
+      console.log("[DEBUG] Scan Debug Info:");
       console.log("- Scanned value:", scannedValue);
       console.log("- Parsed tracking number:", trackingNumber);
       console.log("- Parsed order ID:", orderId);
@@ -177,26 +178,26 @@ export default function StaffScanner({ loaderData }: any) {
       
       // Show debug info in alert for mobile  
       const debugInfo = [
-        `📦 Scanned: ${scannedValue}`,
-        `🏷️ Tracking: ${trackingNumber}`,
-        `👤 Staff: ${staff.name}`,
-        `🏢 Your warehouses: ${staff.warehouses?.map(w => w.name).join(', ')}`,
-        `🏭 Forwarder ID: ${staff.forwarderId.slice(-8)}`,
-        `📊 Your orders: ${todaysOrders?.length || 0} (should show 29)`,
-        `📋 Orders available for search: ${todaysOrders?.map(o => o.trackingNumber).slice(0,5).join(', ')}...`,
+        `[Package] Scanned: ${scannedValue}`,
+        `[Tag] Tracking: ${trackingNumber}`,
+        `[User] Staff: ${staff.name}`,
+        `[Building] Your warehouses: ${staff.warehouses?.map(w => w.name).join(', ')}`,
+        `[Building] Forwarder ID: ${staff.forwarderId.slice(-8)}`,
+        `[Stats] Your orders: ${todaysOrders?.length || 0} (should show 29)`,
+        `[List] Orders available for search: ${todaysOrders?.map(o => o.trackingNumber).slice(0,5).join(', ')}...`,
         debugOrder?.found 
-          ? `✅ Order exists in: ${debugOrder.warehouseName}` 
-          : `❌ Order not found (searched ${debugOrder?.totalOrdersInForwarder || 0} orders)`,
+          ? `[Success] Order exists in: ${debugOrder.warehouseName}` 
+          : `[Error] Order not found (searched ${debugOrder?.totalOrdersInForwarder || 0} orders)`,
         globalOrder?.found 
-          ? `🌍 FOUND ELSEWHERE: Forwarder ${globalOrder.order.forwarderId.slice(-8)}` 
-          : `🌍 Not found anywhere (${globalOrder?.totalOrders || 0} total orders)`,
-        `🔧 DIRECT ORDER LOOKUP:`,
+          ? `[Globe] FOUND ELSEWHERE: Forwarder ${globalOrder.order.forwarderId.slice(-8)}` 
+          : `[Globe] Not found anywhere (${globalOrder?.totalOrders || 0} total orders)`,
+        `[Settings] DIRECT ORDER LOOKUP:`,
         directLookup ? `  - Order found: ${directLookup.found}` : '  - Direct lookup loading...',
         directLookup?.found ? `  - Order forwarder: ${directLookup.order.forwarderId}` : '',
         directLookup?.found ? `  - Order warehouse: ${directLookup.order.warehouseId}` : '',
         directLookup?.found ? `  - Warehouse name: ${directLookup.warehouse?.name}` : '',
         directLookup && !directLookup.found ? `  - Total orders in system: ${directLookup.totalOrders}` : '',
-        `🔧 STAFF INFO:`,
+        `[Settings] STAFF INFO:`,
         `  - Staff forwarder ID: ${staff.forwarderId}`,
         `  - Staff assigned warehouses: ${JSON.stringify(staff.assignedWarehouses)}`,
         `  - Staff warehouses from UI: ${JSON.stringify(staff.warehouses?.map(w => w._id))}`,

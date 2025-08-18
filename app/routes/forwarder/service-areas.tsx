@@ -2,7 +2,7 @@ import type { Route } from "./+types/service-areas";
 import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import { MapPin, Plus, Edit, Trash2, Globe, Clock, DollarSign, AlertCircle, Save, X } from "lucide-react";
+import { MapPin, Plus, Edit, Trash2, Globe, Clock, DollarSign, AlertCircle, Save, X, Search, PenTool } from "lucide-react";
 import { getAllCountries, getStatesForCountry, basicAddressShape, getCountryCode } from "../../utils/addressValidation";
 import WarehouseOperatingHours from "../../components/warehouse/WarehouseOperatingHours";
 import AddressAutocomplete from "../../components/ui/AddressAutocomplete";
@@ -585,7 +585,8 @@ export default function ForwarderServiceAreasPage() {
                         : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                     }`}
                   >
-                    🔍 Smart Search
+                    <Search className="w-3 h-3 mr-1" />
+                    Smart Search
                   </button>
                   <button
                     type="button"
@@ -596,7 +597,8 @@ export default function ForwarderServiceAreasPage() {
                         : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                     }`}
                   >
-                    ✏️ Manual Entry
+                    <PenTool className="w-3 h-3 mr-1" />
+                    Manual Entry
                   </button>
                 </div>
               </div>
@@ -819,7 +821,8 @@ export default function ForwarderServiceAreasPage() {
                               : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                           }`}
                         >
-                          🔍 Smart
+                          <Search className="w-3 h-3 mr-1" />
+                          Smart
                         </button>
                         <button
                           type="button"
@@ -830,7 +833,8 @@ export default function ForwarderServiceAreasPage() {
                               : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                           }`}
                         >
-                          ✏️ Manual
+                          <PenTool className="w-3 h-3 mr-1" />
+                          Manual
                         </button>
                       </div>
                     </div>

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
+import { Truck } from "lucide-react";
 
 interface ShippingRatesModalProps {
   orderId: string;
@@ -238,7 +239,7 @@ export default function ShippingRatesModal({
           {/* No API Integrations Available */}
           {!hasApiIntegrations && !manualMode && (
             <div className="text-center py-8">
-              <div className="text-gray-400 text-4xl mb-4">🚚</div>
+              <Truck className="w-16 h-16 mx-auto mb-4 text-gray-400" />
               <p className="text-gray-500 mb-2">No courier integrations available</p>
               <p className="text-xs text-gray-400 mb-4">
                 Set up API integrations in Courier Settings for automated label creation

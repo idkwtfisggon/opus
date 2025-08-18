@@ -3,6 +3,7 @@ import { getAuth } from "@clerk/react-router/ssr.server";
 import { fetchQuery } from "convex/nextjs";
 import { api } from "../../../convex/_generated/api";
 import EmailManager from "../../components/customer/EmailManager";
+import { ShoppingBag, Lightbulb, Mail } from "lucide-react";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -53,7 +54,10 @@ export default function CustomerEmailSettings({ loaderData }: Route.ComponentPro
         {/* How It Works Section */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-8">
           <h2 className="text-lg font-semibold text-blue-900 mb-4">
-            🛍️ How Email Forwarding Works
+            <div className="flex items-center gap-2">
+              <ShoppingBag className="w-5 h-5 text-blue-600" />
+              <span>How Email Forwarding Works</span>
+            </div>
           </h2>
           <div className="space-y-3 text-blue-800">
             <div className="flex items-start gap-3">
@@ -81,7 +85,10 @@ export default function CustomerEmailSettings({ loaderData }: Route.ComponentPro
         {/* Browser Extension Tip */}
         <div className="bg-green-50 border border-green-200 rounded-lg p-6 mt-8">
           <h3 className="text-lg font-semibold text-green-900 mb-3">
-            💡 Pro Tip: Browser Extension
+            <div className="flex items-center gap-2">
+              <Lightbulb className="w-5 h-5 text-green-600" />
+              <span>Pro Tip: Browser Extension</span>
+            </div>
           </h3>
           <p className="text-green-800 mb-4">
             Install our browser extension to automatically fill your shopping email address at checkout. 
@@ -95,7 +102,10 @@ export default function CustomerEmailSettings({ loaderData }: Route.ComponentPro
         {/* Support Section */}
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 mt-8">
           <h3 className="text-lg font-semibold text-gray-900 mb-3">
-            📧 Email Troubleshooting
+            <div className="flex items-center gap-2">
+              <Mail className="w-5 h-5 text-orange-600" />
+              <span>Email Troubleshooting</span>
+            </div>
           </h3>
           <div className="space-y-2 text-gray-700">
             <p><strong>Not receiving forwards?</strong> Check your spam folder and add our domain to your whitelist.</p>

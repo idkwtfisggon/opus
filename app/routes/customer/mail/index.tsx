@@ -4,6 +4,7 @@ import { fetchQuery } from "convex/nextjs";
 import { api } from "../../../../convex/_generated/api";
 import { useQuery } from "convex/react";
 import { useState } from "react";
+import { XCircle, Package, Truck, Mail } from "lucide-react";
 
 export function meta() {
   return [
@@ -56,10 +57,10 @@ export default function CustomerMail({ loaderData }: Route.ComponentProps) {
   };
 
   const getEmailIcon = (email: any) => {
-    if (!email.isShippingEmail) return "🚫"; // Spam
-    if (email.matchedOrderId) return "📦"; // Matched to order
-    if (email.extractedData.trackingNumbers.length > 0) return "🚚"; // Has tracking
-    return "📧"; // Regular email
+    if (!email.isShippingEmail) return <XCircle className="w-4 h-4 text-red-500" />; // Spam
+    if (email.matchedOrderId) return <Package className="w-4 h-4 text-green-500" />; // Matched to order
+    if (email.extractedData.trackingNumbers.length > 0) return <Truck className="w-4 h-4 text-blue-500" />; // Has tracking
+    return <Mail className="w-4 h-4 text-gray-500" />; // Regular email
   };
 
   return (
@@ -269,7 +270,7 @@ export default function CustomerMail({ loaderData }: Route.ComponentProps) {
               ) : (
                 <div className="flex items-center justify-center h-96 text-gray-500">
                   <div className="text-center">
-                    <div className="text-4xl mb-4">📧</div>
+                    <Mail className="w-16 h-16 mx-auto mb-4 text-gray-400" />
                     <p>Select an email to read</p>
                   </div>
                 </div>

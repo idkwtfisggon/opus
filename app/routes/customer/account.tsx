@@ -12,7 +12,7 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Separator } from "~/components/ui/separator";
 import { Badge } from "~/components/ui/badge";
-import { UserCircle, Mail, Key, Shield, Bell, Trash2, Download, Eye, EyeOff, X, MapPin, AlertCircle, Info } from "lucide-react";
+import { UserCircle, Mail, Key, Shield, Bell, Trash2, Download, Eye, EyeOff, X, MapPin, AlertCircle, Info, MapPin as AddressIcon } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 
 export async function loader(args: Route.LoaderArgs) {
@@ -381,7 +381,10 @@ export default function CustomerAccountSettings({ loaderData }: Route.ComponentP
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <h4 className="font-medium text-blue-900 mb-2">📍 Address Book</h4>
+              <div className="flex items-center gap-2 mb-2">
+                <AddressIcon className="w-4 h-4 text-blue-600" />
+                <h4 className="font-medium text-blue-900">Address Book</h4>
+              </div>
               <p className="text-sm text-blue-800 mb-3">
                 Your addresses have been moved to Settings for better organization. You can now manage multiple addresses, set defaults, and more.
               </p>
@@ -729,7 +732,10 @@ export default function CustomerAccountSettings({ loaderData }: Route.ComponentP
 
             {/* Security Notice */}
             <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
-              <h4 className="font-medium text-yellow-900 mb-2">🔒 Security Recommendation</h4>
+              <div className="flex items-center gap-2 mb-2">
+                <Shield className="w-4 h-4 text-yellow-600" />
+                <h4 className="font-medium text-yellow-900">Security Recommendation</h4>
+              </div>
               <p className="text-sm text-yellow-800">
                 We recommend enabling two-factor authentication to secure your account, especially since you'll be receiving valuable packages. 
                 Regular security checkups help keep your account safe.

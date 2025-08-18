@@ -1,5 +1,5 @@
 import type { Route } from "./+types/orders";
-import { Package, Clock, MapPin, Truck, Eye, Search, Filter } from "lucide-react";
+import { Package, Search, Filter, Eye } from "lucide-react";
 import React, { useState } from "react";
 
 export function meta({}: Route.MetaArgs) {
@@ -78,17 +78,6 @@ export default function CustomerOrders() {
       case "in_transit": return "bg-green-100 text-green-800 border-green-200";
       case "delivered": return "bg-gray-100 text-gray-800 border-gray-200";
       default: return "bg-gray-100 text-gray-800 border-gray-200";
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "incoming": return <Clock className="w-4 h-4" />;
-      case "arrived_at_warehouse": return <Package className="w-4 h-4" />;
-      case "packed": return <Package className="w-4 h-4" />;
-      case "in_transit": return <Truck className="w-4 h-4" />;
-      case "delivered": return <MapPin className="w-4 h-4" />;
-      default: return <Package className="w-4 h-4" />;
     }
   };
 
@@ -176,10 +165,6 @@ export default function CustomerOrders() {
                   <div className="flex items-start justify-between">
                     {/* Order Info */}
                     <div className="flex items-start space-x-4 flex-1">
-                      <div className="flex-shrink-0 mt-1">
-                        {getStatusIcon(order.status)}
-                      </div>
-                      
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between">
                           <div>

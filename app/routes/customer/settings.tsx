@@ -1,7 +1,7 @@
 import type { Route } from "./+types/settings";
 import { getAuth } from "@clerk/react-router/ssr.server";
 import { redirect } from "react-router";
-import { Settings as SettingsIcon, Package, MapPin, CreditCard, Bell, Shield, Globe, Palette, Plus, Edit2, Trash2, CheckCircle, AlertCircle, Info, X } from "lucide-react";
+import { Settings as SettingsIcon, Package, MapPin, CreditCard, Bell, Shield, Globe, Palette, Plus, Edit2, Trash2, CheckCircle, AlertCircle, Info, X, Lightbulb, Search, PenTool } from "lucide-react";
 import React, { useState } from "react";
 import { useUser } from "@clerk/react-router";
 import { useMutation, useQuery } from "convex/react";
@@ -338,7 +338,10 @@ export default function CustomerSettings({ loaderData }: Route.ComponentProps) {
                 </div>
 
                 <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <h4 className="font-medium text-blue-900 mb-2">💡 Pro Tip</h4>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Lightbulb className="w-4 h-4 text-blue-600" />
+                    <h4 className="font-medium text-blue-900">Pro Tip</h4>
+                  </div>
                   <p className="text-sm text-blue-800">
                     Enable package consolidation to save up to 40% on international shipping costs when you have multiple orders.
                   </p>
@@ -450,7 +453,8 @@ export default function CustomerSettings({ loaderData }: Route.ComponentProps) {
                             : 'bg-muted text-muted-foreground hover:bg-muted/80'
                         }`}
                       >
-                        🔍 Smart Search
+                        <Search className="w-3 h-3 mr-1" />
+                        Smart Search
                       </button>
                       <button
                         type="button"
@@ -461,7 +465,8 @@ export default function CustomerSettings({ loaderData }: Route.ComponentProps) {
                             : 'bg-muted text-muted-foreground hover:bg-muted/80'
                         }`}
                       >
-                        ✏️ Manual Entry
+                        <PenTool className="w-3 h-3 mr-1" />
+                        Manual Entry
                       </button>
                     </div>
                   </div>
@@ -640,7 +645,10 @@ export default function CustomerSettings({ loaderData }: Route.ComponentProps) {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <h4 className="font-medium text-blue-900 mb-2">🔔 Notification Settings</h4>
+              <div className="flex items-center gap-2 mb-2">
+                <Bell className="w-4 h-4 text-blue-600" />
+                <h4 className="font-medium text-blue-900">Notification Settings</h4>
+              </div>
               <p className="text-sm text-blue-800 mb-3">
                 Manage your email, SMS, and push notification preferences in your Account Settings.
               </p>
@@ -748,7 +756,10 @@ export default function CustomerSettings({ loaderData }: Route.ComponentProps) {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <h4 className="font-medium text-blue-900 mb-2">🔒 Security Settings</h4>
+              <div className="flex items-center gap-2 mb-2">
+                <Shield className="w-4 h-4 text-blue-600" />
+                <h4 className="font-medium text-blue-900">Security Settings</h4>
+              </div>
               <p className="text-sm text-blue-800 mb-3">
                 Manage your password, privacy settings, two-factor authentication, and data download options in Account Settings.
               </p>
