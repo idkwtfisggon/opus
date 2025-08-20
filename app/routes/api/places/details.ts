@@ -1,11 +1,19 @@
 import type { Route } from "./+types/details";
 
-const GOOGLE_PLACES_API_KEY = process.env.GOOGLE_PLACES_API_KEY || 'AIzaSyDepvSDx1JvevY4e-crsvBNBqiEYetW4Vg';
+const GOOGLE_PLACES_API_KEY = process.env.GOOGLE_PLACES_API_KEY;
 
 export async function loader({ request }: Route.LoaderArgs) {
   const url = new URL(request.url);
   const placeId = url.searchParams.get('place_id');
   const sessiontoken = url.searchParams.get('sessiontoken');
+
+  if (!GOOGLE_PLACES_API_KEY) {
+    console.error('Google Places API key is not configured');
+    return Response.json(
+      { error: 'Google Places API not configured' },
+      { status: 500 }
+    );
+  }
 
   if (!placeId) {
     return Response.json(
@@ -35,6 +43,12 @@ export async function loader({ request }: Route.LoaderArgs) {
     }
 
     const data = await response.json();
+    
+    // Log the response for debugging
+    if (data.status !== 'OK') {
+      console.error('Google Places Details API error:', data);
+    }
+    
     return Response.json(data);
   } catch (error) {
     console.error('Error in places details API:', error);

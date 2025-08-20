@@ -33,8 +33,8 @@ export default function WarehouseOperatingHours({
       wednesday: { open: "09:00", close: "17:00" },
       thursday: { open: "09:00", close: "17:00" },
       friday: { open: "09:00", close: "17:00" },
-      saturday: { closed: true },
-      sunday: { closed: true },
+      saturday: { closed: true, open: "", close: "" },
+      sunday: { closed: true, open: "", close: "" },
     },
     holidaySchedule: currentHolidaySchedule || []
   });
@@ -80,16 +80,21 @@ export default function WarehouseOperatingHours({
   };
 
   const toggleDayClosed = (day: string) => {
-    setFormData(prev => ({
-      ...prev,
-      operatingHours: {
-        ...prev.operatingHours,
-        [day]: {
-          ...prev.operatingHours[day],
-          closed: !prev.operatingHours[day]?.closed
+    setFormData(prev => {
+      const isClosed = !prev.operatingHours[day]?.closed;
+      return {
+        ...prev,
+        operatingHours: {
+          ...prev.operatingHours,
+          [day]: {
+            ...prev.operatingHours[day],
+            closed: isClosed,
+            open: isClosed ? "" : (prev.operatingHours[day]?.open || "09:00"),
+            close: isClosed ? "" : (prev.operatingHours[day]?.close || "17:00")
+          }
         }
-      }
-    }));
+      };
+    });
   };
 
   const addHoliday = () => {

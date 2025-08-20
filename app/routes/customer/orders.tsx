@@ -84,8 +84,19 @@ export default function CustomerOrders({ loaderData }: Route.ComponentProps) {
     <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
       {/* Page Header */}
       <div className="px-4 py-6 sm:px-0">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">My Orders</h1>
-        <p className="text-gray-600">Track and manage all your international shipments</p>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">My Orders</h1>
+            <p className="text-gray-600">Track and manage all your international shipments</p>
+          </div>
+          <a 
+            href="/customer/create-order"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors flex items-center gap-2"
+          >
+            <Package className="h-5 w-5" />
+            Create New Order
+          </a>
+        </div>
       </div>
 
       {/* Filters and Search */}
@@ -151,9 +162,18 @@ export default function CustomerOrders({ loaderData }: Route.ComponentProps) {
                 <p className="text-gray-500 text-lg font-medium">
                   {orders.length === 0 ? "No orders yet" : "No orders found"}
                 </p>
-                <p className="text-gray-400">
+                <p className="text-gray-400 mb-6">
                   {orders.length === 0 ? "Create your first order to get started" : "Try adjusting your search or filter criteria"}
                 </p>
+                {orders.length === 0 && (
+                  <a 
+                    href="/customer/create-order"
+                    className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+                  >
+                    <Package className="h-5 w-5" />
+                    Create Your First Order
+                  </a>
+                )}
               </div>
             ) : (
               filteredOrders.map((order) => (

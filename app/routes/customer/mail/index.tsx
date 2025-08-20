@@ -4,7 +4,8 @@ import { fetchQuery } from "convex/nextjs";
 import { api } from "../../../../convex/_generated/api";
 import { useQuery } from "convex/react";
 import { useState } from "react";
-import { XCircle, Package, Truck, Mail } from "lucide-react";
+import { XCircle, Package, Truck, Mail, ShoppingBag, Lightbulb, Settings } from "lucide-react";
+import EmailManager from "../../../components/customer/EmailManager";
 
 export function meta() {
   return [
@@ -40,6 +41,7 @@ export async function loader(args: Route.LoaderArgs) {
 export default function CustomerMail({ loaderData }: Route.ComponentProps) {
   const { customer } = loaderData;
   const [selectedEmailId, setSelectedEmailId] = useState<string | null>(null);
+  const [showEmailSettings, setShowEmailSettings] = useState(false);
 
   // Get customer's emails
   const allEmails = useQuery(api.emails.getCustomerEmails, { 
@@ -67,11 +69,101 @@ export default function CustomerMail({ loaderData }: Route.ComponentProps) {
     <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
       <div className="px-4 py-6 sm:px-0">
         {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Mail</h1>
-          <p className="mt-2 text-gray-600">
-            Your shipping confirmations and order updates
-          </p>
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Mail</h1>
+            <p className="mt-2 text-gray-600">
+              Manage email forwarding and view your shipping confirmations
+            </p>
+          </div>
+          <button
+            onClick={() => setShowEmailSettings(!showEmailSettings)}
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+          >
+            <Settings className="w-4 h-4" />
+            {showEmailSettings ? 'Hide Settings' : 'Email Settings'}
+          </button>
+        </div>
+
+        {/* Email Settings Section */}
+        {showEmailSettings && (
+          <div className="space-y-6 mb-8">
+            {/* How It Works Section */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+              <h2 className="text-lg font-semibold text-blue-900 mb-4">
+                <div className="flex items-center gap-2">
+                  <ShoppingBag className="w-5 h-5 text-blue-600" />
+                  <span>How Email Forwarding Works</span>
+                </div>
+              </h2>
+              <div className="space-y-3 text-blue-800">
+                <div className="flex items-start gap-3">
+                  <span className="bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold flex-shrink-0 mt-0.5">1</span>
+                  <p>Generate a unique email address for online shopping</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <span className="bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold flex-shrink-0 mt-0.5">2</span>
+                  <p>Use this email when shopping on any website (Amazon, AliExpress, etc.)</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <span className="bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold flex-shrink-0 mt-0.5">3</span>
+                  <p>Shipping confirmations are automatically processed and forwarded to your real email</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <span className="bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold flex-shrink-0 mt-0.5">4</span>
+                  <p>Our system extracts tracking numbers and matches them to your orders</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Email Manager Component */}
+            <EmailManager customerId={customer._id} />
+
+            {/* Browser Extension Tip */}
+            <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+              <h3 className="text-lg font-semibold text-green-900 mb-3">
+                <div className="flex items-center gap-2">
+                  <Lightbulb className="w-5 h-5 text-green-600" />
+                  <span>Pro Tip: Browser Extension</span>
+                </div>
+              </h3>
+              <p className="text-green-800 mb-4">
+                Install our browser extension to automatically fill your shopping email address at checkout. 
+                No more copying and pasting!
+              </p>
+              <button className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors">
+                Install Browser Extension
+              </button>
+            </div>
+
+            {/* Support Section */}
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">
+                <div className="flex items-center gap-2">
+                  <Mail className="w-5 h-5 text-orange-600" />
+                  <span>Email Troubleshooting</span>
+                </div>
+              </h3>
+              <div className="space-y-2 text-gray-700">
+                <p><strong>Not receiving forwards?</strong> Check your spam folder and add our domain to your whitelist.</p>
+                <p><strong>Missing tracking info?</strong> Some shops send tracking in separate emails - these will be processed too.</p>
+                <p><strong>Wrong email detected?</strong> Our AI learns from patterns - report any mistakes to improve accuracy.</p>
+              </div>
+              <div className="mt-4">
+                <a href="/support" className="text-blue-600 hover:text-blue-800 underline">
+                  Contact Support →
+                </a>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Mailbox Section */}
+        <div className="border-t border-gray-200 pt-6">
+          <div className="mb-4">
+            <h2 className="text-xl font-semibold text-gray-900">Mailbox</h2>
+            <p className="text-gray-600">Your processed shipping emails and confirmations</p>
+          </div>
         </div>
 
         {/* Email Stats */}

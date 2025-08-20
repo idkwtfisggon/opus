@@ -2,13 +2,15 @@ import { getAuth } from "@clerk/react-router/ssr.server";
 import { fetchQuery } from "convex/nextjs";
 import { redirect } from "react-router";
 import type { Route } from "./+types/customer";
-import { useMutation } from "convex/react";
+import { useAction, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useNavigate } from "react-router";
 import { useState } from "react";
 import * as React from "react";
 import { useUser } from "@clerk/react-router";
-import { CheckCircle, Package, MapPin, Phone, ArrowRight, ArrowLeft, AlertCircle, Info, Search, PenTool } from "lucide-react";
+import { CheckCircle, Package, MapPin, Phone, ArrowRight, ArrowLeft, AlertCircle, Info, Search, PenTool, CreditCard } from "lucide-react";
+import StripeProvider from "~/components/stripe/StripeProvider";
+import AddPaymentMethodForm from "~/components/stripe/AddPaymentMethodForm";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
@@ -46,6 +48,12 @@ const STEPS = [
     title: "Shipping Address",
     description: "Where you'd like packages delivered",
     icon: MapPin
+  },
+  {
+    id: 4,
+    title: "Payment Method",
+    description: "Add a card for seamless ordering",
+    icon: CreditCard
   }
 ];
 
@@ -78,6 +86,7 @@ export default function CustomerOnboardingPage({ loaderData }: Route.ComponentPr
   const [loading, setLoading] = useState(false);
   
   const createUser = useMutation(api.users.createUser);
+  const createSetupIntent = useAction(api.stripe.createSetupIntent);
 
   const [formData, setFormData] = useState<FormData>({
     fullName: user?.fullName || user?.firstName || "",
@@ -95,6 +104,11 @@ export default function CustomerOnboardingPage({ loaderData }: Route.ComponentPr
   const [countries] = useState(() => getAllCountries());
   const [states, setStates] = useState<Array<{ code: string; name: string }>>([]);
   const [useGoogleAutocomplete, setUseGoogleAutocomplete] = useState(true);
+
+  // Payment state
+  const [setupIntent, setSetupIntent] = useState<{ clientSecret: string; setupIntentId: string } | null>(null);
+  const [paymentAdded, setPaymentAdded] = useState(false);
+  const [skipPayment, setSkipPayment] = useState(false);
 
   const updateFormData = (field: keyof FormData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -155,13 +169,28 @@ export default function CustomerOnboardingPage({ loaderData }: Route.ComponentPr
       case 3:
         // Require valid address for step 3
         return addressValidation?.isValid === true;
+      case 4:
+        // Payment step is optional - can skip or add payment
+        return paymentAdded || skipPayment;
       default:
         return true;
     }
   };
 
-  const nextStep = () => {
-    if (validateStep(currentStep) && currentStep < 3) {
+  const nextStep = async () => {
+    if (validateStep(currentStep) && currentStep < 4) {
+      // If moving to step 4 (payment), prepare the setup intent
+      if (currentStep === 3) {
+        try {
+          setLoading(true);
+          const result = await createSetupIntent({});
+          setSetupIntent(result);
+        } catch (error) {
+          console.error("Failed to create setup intent:", error);
+        } finally {
+          setLoading(false);
+        }
+      }
       setCurrentStep(currentStep + 1);
     }
   };
@@ -170,6 +199,15 @@ export default function CustomerOnboardingPage({ loaderData }: Route.ComponentPr
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1);
     }
+  };
+
+  // Payment handlers
+  const handlePaymentMethodAdded = () => {
+    setPaymentAdded(true);
+  };
+
+  const handleSkipPayment = () => {
+    setSkipPayment(true);
   };
 
   const handleSubmit = async () => {
@@ -584,6 +622,75 @@ export default function CustomerOnboardingPage({ loaderData }: Route.ComponentPr
               </div>
             )}
 
+            {/* Step 4: Payment Method */}
+            {currentStep === 4 && (
+              <div className="space-y-6">
+                <div className="text-center mb-6">
+                  <h3 className="text-lg font-semibold text-foreground mb-2">Add a Payment Method</h3>
+                  <p className="text-muted-foreground">
+                    Set up Uber-style payments - add your card once and we'll handle the rest for future orders.
+                  </p>
+                </div>
+
+                {!paymentAdded && !skipPayment ? (
+                  <div className="space-y-4">
+                    {setupIntent ? (
+                      <StripeProvider clientSecret={setupIntent.clientSecret}>
+                        <AddPaymentMethodForm
+                          onSuccess={handlePaymentMethodAdded}
+                          onCancel={() => {
+                            setSetupIntent(null);
+                          }}
+                          clientSecret={setupIntent.clientSecret}
+                        />
+                      </StripeProvider>
+                    ) : (
+                      <div className="text-center py-8">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                        <p className="text-muted-foreground">Preparing secure payment form...</p>
+                      </div>
+                    )}
+
+                    <div className="text-center pt-4">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={handleSkipPayment}
+                        className="text-muted-foreground hover:text-foreground"
+                      >
+                        Skip for now - I'll add this later
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <CheckCircle className="w-8 h-8 text-green-600" />
+                    </div>
+                    <h4 className="font-semibold text-foreground mb-2">
+                      {paymentAdded ? "Payment Method Added!" : "Payment Setup Skipped"}
+                    </h4>
+                    <p className="text-muted-foreground mb-4">
+                      {paymentAdded 
+                        ? "Your card has been securely saved for future orders." 
+                        : "You can add payment methods later in your account settings."
+                      }
+                    </p>
+                    
+                    <div className="bg-primary/5 border border-primary/20 p-4 rounded-lg text-left">
+                      <h5 className="font-medium text-foreground mb-2">You're all set!</h5>
+                      <ul className="text-sm text-muted-foreground space-y-1">
+                        <li>• Track packages from any store worldwide</li>
+                        <li>• Get the best shipping rates automatically</li>
+                        <li>• Receive real-time delivery updates</li>
+                        {paymentAdded && <li>• Seamless checkout for future orders</li>}
+                      </ul>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Navigation Buttons */}
             <div className="flex justify-between pt-6 border-t border-border">
               <Button
@@ -597,10 +704,10 @@ export default function CustomerOnboardingPage({ loaderData }: Route.ComponentPr
                 Previous
               </Button>
 
-              {currentStep === 3 ? (
+              {currentStep === 4 ? (
                 <Button
                   onClick={handleSubmit}
-                  disabled={loading}
+                  disabled={loading || (!paymentAdded && !skipPayment)}
                   className="flex items-center gap-2 shadow-sm"
                 >
                   {loading ? (
@@ -618,11 +725,20 @@ export default function CustomerOnboardingPage({ loaderData }: Route.ComponentPr
               ) : (
                 <Button
                   onClick={nextStep}
-                  disabled={!validateStep(currentStep)}
+                  disabled={!validateStep(currentStep) || loading}
                   className="flex items-center gap-2 shadow-sm"
                 >
-                  Next
-                  <ArrowRight className="h-4 w-4" />
+                  {loading && currentStep === 3 ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-foreground"></div>
+                      Preparing...
+                    </>
+                  ) : (
+                    <>
+                      Next
+                      <ArrowRight className="h-4 w-4" />
+                    </>
+                  )}
                 </Button>
               )}
             </div>

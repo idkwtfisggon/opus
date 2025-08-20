@@ -224,19 +224,19 @@ export default function CreateOrderPage() {
               {(packageDetails.fromCountry === "US" || packageDetails.fromCountry === "FR" || packageDetails.fromCountry === "DE") && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    State/Province <span className="text-gray-500 font-normal">(Optional)</span>
+                    State/Province <span className="text-gray-500 font-normal">(Optional - helps find closer warehouses)</span>
                   </label>
                   <input
                     type="text"
                     value={packageDetails.fromState}
                     onChange={(e) => setPackageDetails(prev => ({ ...prev, fromState: e.target.value }))}
-                    placeholder={packageDetails.fromCountry === "US" ? "California" : packageDetails.fromCountry === "FR" ? "Provence-Alpes-Côte d'Azur" : "Bavaria"}
+                    placeholder={packageDetails.fromCountry === "US" ? "California" : packageDetails.fromCountry === "FR" ? "Île-de-France" : "Bavaria"}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md"
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    {packageDetails.fromCountry === "US" ? "State name (e.g., California, New York)" : 
-                     packageDetails.fromCountry === "FR" ? "Region name (e.g., Provence-Alpes-Côte d'Azur)" :
-                     "State name (e.g., Bavaria, Berlin)"}
+                    {packageDetails.fromCountry === "US" ? "State name helps us find warehouses closer to you (e.g., California, New York)" : 
+                     packageDetails.fromCountry === "FR" ? "Region name helps us find warehouses closer to you (e.g., Île-de-France, Provence-Alpes-Côte d'Azur)" :
+                     "State name helps us find warehouses closer to you (e.g., Bavaria, Berlin)"}
                   </p>
                 </div>
               )}
@@ -364,15 +364,48 @@ export default function CreateOrderPage() {
         <div className="px-4 sm:px-0">
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-semibold text-gray-900">
-                Available Shipping Options
-              </h2>
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">
+                  Available Shipping Options
+                </h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  Forwarders shipping from {packageDetails.fromCountry} to {packageDetails.toCountry}
+                </p>
+              </div>
               <button
                 onClick={() => setStep("package")}
                 className="text-blue-600 hover:text-blue-700 text-sm"
               >
                 ← Edit Package Details
               </button>
+            </div>
+
+            {/* Sort Options */}
+            <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+              <div className="flex items-center gap-4">
+                <span className="text-sm font-medium text-gray-700">Sort by:</span>
+                <div className="flex gap-2">
+                  {[
+                    { key: "distance", label: "Closest Warehouse" },
+                    { key: "price", label: "Lowest Price" },
+                    { key: "speed", label: "Fastest Delivery" }
+                  ].map((sort) => (
+                    <button
+                      key={sort.key}
+                      onClick={() => {
+                        setPackageDetails(prev => ({ ...prev, sortBy: sort.key as any }));
+                      }}
+                      className={`px-3 py-1 text-xs rounded-full transition-colors ${
+                        packageDetails.sortBy === sort.key
+                          ? "bg-blue-100 text-blue-700 border border-blue-200"
+                          : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"
+                      }`}
+                    >
+                      {sort.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
 
             {shippingOptions === undefined ? (
@@ -403,6 +436,12 @@ export default function CreateOrderPage() {
                           <h3 className="text-lg font-medium text-gray-900">{option.forwarder.name}</h3>
                           <p className="text-sm text-gray-600">{option.service.name}</p>
                           <p className="text-xs text-gray-500">{option.service.description}</p>
+                          <div className="flex items-center mt-1">
+                            <MapPin className="h-3 w-3 text-gray-400 mr-1" />
+                            <span className="text-xs text-gray-500">
+                              Shipping from: {option.warehouse.city}, {option.warehouse.state} {option.warehouse.country}
+                            </span>
+                          </div>
                         </div>
                       </div>
                       <div className="text-right">

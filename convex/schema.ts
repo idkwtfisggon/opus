@@ -77,13 +77,34 @@ export default defineSchema({
     
     // Operating hours (if not set, assume fully operational 24/7)
     operatingHours: v.optional(v.object({
-      monday: v.optional(v.object({ open: v.string(), close: v.string(), closed: v.optional(v.boolean()) })),
-      tuesday: v.optional(v.object({ open: v.string(), close: v.string(), closed: v.optional(v.boolean()) })),
-      wednesday: v.optional(v.object({ open: v.string(), close: v.string(), closed: v.optional(v.boolean()) })),
-      thursday: v.optional(v.object({ open: v.string(), close: v.string(), closed: v.optional(v.boolean()) })),
-      friday: v.optional(v.object({ open: v.string(), close: v.string(), closed: v.optional(v.boolean()) })),
-      saturday: v.optional(v.object({ open: v.string(), close: v.string(), closed: v.optional(v.boolean()) })),
-      sunday: v.optional(v.object({ open: v.string(), close: v.string(), closed: v.optional(v.boolean()) })),
+      monday: v.optional(v.union(
+        v.object({ open: v.string(), close: v.string() }),
+        v.object({ closed: v.literal(true) })
+      )),
+      tuesday: v.optional(v.union(
+        v.object({ open: v.string(), close: v.string() }),
+        v.object({ closed: v.literal(true) })
+      )),
+      wednesday: v.optional(v.union(
+        v.object({ open: v.string(), close: v.string() }),
+        v.object({ closed: v.literal(true) })
+      )),
+      thursday: v.optional(v.union(
+        v.object({ open: v.string(), close: v.string() }),
+        v.object({ closed: v.literal(true) })
+      )),
+      friday: v.optional(v.union(
+        v.object({ open: v.string(), close: v.string() }),
+        v.object({ closed: v.literal(true) })
+      )),
+      saturday: v.optional(v.union(
+        v.object({ open: v.string(), close: v.string() }),
+        v.object({ closed: v.literal(true) })
+      )),
+      sunday: v.optional(v.union(
+        v.object({ open: v.string(), close: v.string() }),
+        v.object({ closed: v.literal(true) })
+      )),
     })),
     holidaySchedule: v.optional(v.array(v.object({
       name: v.string(),
@@ -117,13 +138,34 @@ export default defineSchema({
     
     // Operating hours (if not set, inherit from forwarder or assume regular office hours)
     operatingHours: v.optional(v.object({
-      monday: v.optional(v.object({ open: v.string(), close: v.string(), closed: v.optional(v.boolean()) })),
-      tuesday: v.optional(v.object({ open: v.string(), close: v.string(), closed: v.optional(v.boolean()) })),
-      wednesday: v.optional(v.object({ open: v.string(), close: v.string(), closed: v.optional(v.boolean()) })),
-      thursday: v.optional(v.object({ open: v.string(), close: v.string(), closed: v.optional(v.boolean()) })),
-      friday: v.optional(v.object({ open: v.string(), close: v.string(), closed: v.optional(v.boolean()) })),
-      saturday: v.optional(v.object({ open: v.string(), close: v.string(), closed: v.optional(v.boolean()) })),
-      sunday: v.optional(v.object({ open: v.string(), close: v.string(), closed: v.optional(v.boolean()) })),
+      monday: v.optional(v.union(
+        v.object({ open: v.string(), close: v.string() }),
+        v.object({ closed: v.literal(true) })
+      )),
+      tuesday: v.optional(v.union(
+        v.object({ open: v.string(), close: v.string() }),
+        v.object({ closed: v.literal(true) })
+      )),
+      wednesday: v.optional(v.union(
+        v.object({ open: v.string(), close: v.string() }),
+        v.object({ closed: v.literal(true) })
+      )),
+      thursday: v.optional(v.union(
+        v.object({ open: v.string(), close: v.string() }),
+        v.object({ closed: v.literal(true) })
+      )),
+      friday: v.optional(v.union(
+        v.object({ open: v.string(), close: v.string() }),
+        v.object({ closed: v.literal(true) })
+      )),
+      saturday: v.optional(v.union(
+        v.object({ open: v.string(), close: v.string() }),
+        v.object({ closed: v.literal(true) })
+      )),
+      sunday: v.optional(v.union(
+        v.object({ open: v.string(), close: v.string() }),
+        v.object({ closed: v.literal(true) })
+      )),
     })),
     holidaySchedule: v.optional(v.array(v.object({
       name: v.string(),

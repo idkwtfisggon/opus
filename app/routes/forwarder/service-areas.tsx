@@ -2,10 +2,12 @@ import type { Route } from "./+types/service-areas";
 import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import { MapPin, Plus, Edit, Trash2, Globe, Clock, DollarSign, AlertCircle, Save, X, Search, PenTool } from "lucide-react";
+import { MapPin, Plus, Edit, Trash2, Globe, Clock, DollarSign, AlertCircle, Save, X, Search, PenTool, CheckCircle } from "lucide-react";
 import { getAllCountries, getStatesForCountry, basicAddressShape, getCountryCode } from "../../utils/addressValidation";
 import WarehouseOperatingHours from "../../components/warehouse/WarehouseOperatingHours";
 import AddressAutocomplete from "../../components/ui/AddressAutocomplete";
+import SimpleServiceAreas from "../../components/warehouse/SimpleServiceAreas";
+import { Notification } from "../../components/ui/notification";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -20,6 +22,20 @@ export default function ForwarderServiceAreasPage() {
   const [editingWarehouseData, setEditingWarehouseData] = useState<any>(null);
   const [editingOperatingHours, setEditingOperatingHours] = useState<any>(null);
   const [editingHolidaySchedule, setEditingHolidaySchedule] = useState<any[]>([]);
+  
+  // Simplified service area state
+  const [simpleServiceAreas, setSimpleServiceAreas] = useState<{
+    primaryCountry: string;
+    proximityRadius?: number;
+    additionalCountries: string[];
+  }>({
+    primaryCountry: "",
+    proximityRadius: 0,
+    additionalCountries: []
+  });
+  const [handlingTimeHours, setHandlingTimeHours] = useState(24);
+  const [additionalFees, setAdditionalFees] = useState(0);
+  const [specialInstructions, setSpecialInstructions] = useState("");
   const [showCreateWarehouse, setShowCreateWarehouse] = useState(false);
   const [newWarehouse, setNewWarehouse] = useState({
     name: "",
@@ -42,6 +58,19 @@ export default function ForwarderServiceAreasPage() {
   // Google autocomplete state
   const [useGoogleAutocomplete, setUseGoogleAutocomplete] = useState(true);
   const [useGoogleAutocompleteEdit, setUseGoogleAutocompleteEdit] = useState(true);
+  
+  // Notification state
+  const [notification, setNotification] = useState<{
+    show: boolean;
+    type: "success" | "error" | "warning";
+    title: string;
+    description?: string;
+  }>({
+    show: false,
+    type: "success",
+    title: "",
+    description: ""
+  });
 
   // Handle Google Places address selection for new warehouse
   const handleGoogleAddressSelectNew = (addressData: {
@@ -72,13 +101,31 @@ export default function ForwarderServiceAreasPage() {
     country: string;
     postalCode: string;
   }) => {
+    console.log('Google address selected:', addressData);
     const countryCode = getCountryCode(addressData.country) || addressData.country;
+    
+    // Get the proper state code if available
+    const availableStatesForCountry = countryCode ? getStatesForCountry(countryCode) : [];
+    
+    // Helper function to normalize strings for comparison
+    const normalize = (str: string) => str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    
+    const matchingState = availableStatesForCountry.find(s => 
+      s.name.toLowerCase() === addressData.state.toLowerCase() || 
+      s.code.toLowerCase() === addressData.state.toLowerCase() ||
+      // Handle accent variations like "Ile-de-France" vs "Île-de-France"
+      normalize(s.name) === normalize(addressData.state) ||
+      // Also check for partial matches
+      s.name.toLowerCase().includes(addressData.state.toLowerCase()) ||
+      addressData.state.toLowerCase().includes(s.name.toLowerCase())
+    );
+    
     setEditingWarehouseData(prev => ({
       ...prev,
       address: addressData.address,
       city: addressData.city,
       state: addressData.state,
-      stateCode: addressData.state,
+      stateCode: matchingState ? matchingState.code : addressData.state,
       country: addressData.country,
       countryCode: countryCode,
       postalCode: addressData.postalCode,
@@ -104,6 +151,7 @@ export default function ForwarderServiceAreasPage() {
   // Mutations
   const createWarehouse = useMutation(api.warehouses.createWarehouse);
   const updateWarehouse = useMutation(api.warehouses.updateWarehouse);
+  const updateWarehouseServiceArea = useMutation(api.warehouseServiceAreas.updateWarehouseServiceArea);
 
 
   // Helper function to get all shipping rates that apply to a specific warehouse
@@ -144,12 +192,23 @@ export default function ForwarderServiceAreasPage() {
     if (!warehouse) return;
 
     // Set warehouse data for editing
+    const countryCode = getCountryCode(warehouse.country) || warehouse.country;
+    
+    // Get proper state info for this country
+    const availableStatesForCountry = countryCode ? getStatesForCountry(countryCode) : [];
+    const matchingState = availableStatesForCountry.find(s => 
+      s.name.toLowerCase() === warehouse.state?.toLowerCase() || 
+      s.code.toLowerCase() === warehouse.state?.toLowerCase()
+    );
+    
     setEditingWarehouseData({
       name: warehouse.name,
       address: warehouse.address,
       city: warehouse.city,
       state: warehouse.state,
+      stateCode: matchingState?.code || warehouse.state,
       country: warehouse.country,
+      countryCode: countryCode,
       postalCode: warehouse.postalCode,
       maxParcels: warehouse.maxParcels || 1000,
     });
@@ -168,40 +227,190 @@ export default function ForwarderServiceAreasPage() {
     // Set holiday schedule
     setEditingHolidaySchedule(warehouse.holidaySchedule || []);
     
+    // Initialize simplified service areas with warehouse country as default
+    setSimpleServiceAreas({
+      primaryCountry: warehouse.country,
+      proximityRadius: 0,
+      additionalCountries: []
+    });
+    
+    // Load existing service areas (legacy)
+    const existingServiceAreas = warehouse.serviceAreas || [];
+    setEditingServiceAreas(existingServiceAreas);
+    
+    // Set default values for service area form - default to warehouse country
+    if (existingServiceAreas.length === 0 && warehouse.country) {
+      setNewCoverageCountry(getCountryCode(warehouse.country) || "");
+    } else {
+      setNewCoverageCountry("");
+    }
+    setNewCoverageType("full");
+    setNewCoverageStates([]);
+    setHandlingTimeHours(existingServiceAreas[0]?.handlingTimeHours || 24);
+    setAdditionalFees(existingServiceAreas[0]?.additionalFees || 0);
+    setSpecialInstructions(existingServiceAreas[0]?.specialInstructions || "");
+    
     setEditingWarehouse(warehouseId);
   };
 
   const handleUpdateWarehouse = async () => {
-    if (!editingWarehouseData || !editingWarehouse) return;
+    if (!editingWarehouseData || !editingWarehouse) {
+      console.error("Missing warehouse data:", { editingWarehouseData, editingWarehouse });
+      return;
+    }
+
+    console.log("Updating warehouse with data:", {
+      warehouseId: editingWarehouse,
+      warehouseData: editingWarehouseData,
+      operatingHours: editingOperatingHours,
+      serviceAreas: editingServiceAreas
+    });
 
     try {
+      // Get the proper country name from the country code if needed
+      const countryToSave = editingWarehouseData.country || 
+                          (editingWarehouseData.countryCode ? 
+                           allCountries.find(c => c.code === editingWarehouseData.countryCode)?.name : "");
+      
+      console.log("Country to save:", countryToSave);
+      
+      // Update warehouse basic details
       await updateWarehouse({
         warehouseId: editingWarehouse,
         name: editingWarehouseData.name,
         address: editingWarehouseData.address,
         city: editingWarehouseData.city,
         state: editingWarehouseData.state,
-        country: editingWarehouseData.country,
+        country: countryToSave,
         postalCode: editingWarehouseData.postalCode,
         maxParcels: editingWarehouseData.maxParcels,
         operatingHours: editingOperatingHours,
         holidaySchedule: editingHolidaySchedule,
       });
       
+      console.log("Warehouse basic details updated successfully");
+      
+      // Update service areas with simplified structure
+      console.log("Updating simplified service areas:", simpleServiceAreas);
+      
+      // Convert simplified structure to backend format
+      const coverage = [
+        {
+          country: simpleServiceAreas.primaryCountry,
+          countryCode: getAllCountries().find(c => c.name === simpleServiceAreas.primaryCountry)?.code || "",
+          isFullCountry: true,
+          priority: 1,
+          proximityRadius: simpleServiceAreas.proximityRadius || 0
+        },
+        ...simpleServiceAreas.additionalCountries.map((country, index) => ({
+          country,
+          countryCode: getAllCountries().find(c => c.name === country)?.code || "",
+          isFullCountry: true,
+          priority: index + 2
+        }))
+      ];
+      
+      if (coverage.length > 0) {
+        await updateWarehouseServiceArea({
+          warehouseId: editingWarehouse,
+          coverage: coverage,
+          handlingTimeHours: handlingTimeHours,
+          additionalFees: additionalFees,
+          specialInstructions: specialInstructions,
+          maxPackagesPerDay: 1000,
+          useCustomRates: false,
+        });
+        console.log("Service areas updated successfully");
+      }
+      
       setEditingWarehouse(null);
       setEditingWarehouseData(null);
       setEditingOperatingHours(null);
       setEditingHolidaySchedule([]);
-      alert('Warehouse details updated successfully!');
+      setSimpleServiceAreas({
+        primaryCountry: "",
+        proximityRadius: 0,
+        additionalCountries: []
+      });
+      
+      // SUCCESS: No more annoying browser popups!
+      setNotification({
+        show: true,
+        type: "success", 
+        title: "✅ Warehouse Updated Successfully",
+        description: "All warehouse details and service areas have been saved."
+      });
     } catch (error) {
       console.error("Error updating warehouse:", error);
-      alert("Failed to update warehouse details. Please try again.");
+      console.error("Error details:", error.message || error);
+      
+      // Show elegant error notification
+      setNotification({
+        show: true,
+        type: "error",
+        title: "Update Failed",
+        description: `Failed to update warehouse details: ${error.message || error}`
+      });
     }
   };
 
   const handleOperatingHoursChange = (operatingHours: any, holidaySchedule: any[]) => {
     setEditingOperatingHours(operatingHours);
     setEditingHolidaySchedule(holidaySchedule);
+  };
+
+  const handleAddCoverageArea = () => {
+    console.log("Add Coverage Area clicked", {
+      newCoverageCountry,
+      newCoverageType,
+      newCoverageStates,
+      allCountries: allCountries.length
+    });
+
+    if (!newCoverageCountry) {
+      console.error("No country selected");
+      toast.warning("Country Required", {
+        description: "Please select a country before adding a coverage area.",
+        duration: 3000,
+      });
+      return;
+    }
+
+    const country = allCountries.find(c => c.code === newCoverageCountry);
+    if (!country) {
+      console.error("Country not found:", newCoverageCountry);
+      return;
+    }
+
+    console.log("Found country:", country);
+
+    const newCoverage = {
+      country: country.name,
+      countryCode: newCoverageCountry,
+      isFullCountry: newCoverageType === "full",
+      states: newCoverageType === "states" ? newCoverageStates : undefined,
+      stateCodes: newCoverageType === "states" ? newCoverageStates : undefined,
+      priority: editingServiceAreas.length + 1,
+    };
+
+    console.log("Adding new coverage:", newCoverage);
+
+    setEditingServiceAreas(prev => {
+      const updated = [...prev, newCoverage];
+      console.log("Updated service areas:", updated);
+      return updated;
+    });
+    
+    // Reset form
+    setNewCoverageCountry("");
+    setNewCoverageType("full");
+    setNewCoverageStates([]);
+    
+    console.log("Coverage area added successfully");
+  };
+
+  const handleRemoveCoverageArea = (index: number) => {
+    setEditingServiceAreas(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleCreateWarehouse = async () => {
@@ -261,13 +470,24 @@ export default function ForwarderServiceAreasPage() {
         operatingHours: "24/7",
       });
       
+      // Show success toast
+      toast.success("Warehouse Created Successfully", {
+        description: "Your new warehouse has been created. Now configure its service areas.",
+        icon: <CheckCircle className="w-4 h-4" />,
+        duration: 4000,
+      });
+      
       // Automatically start configuring service areas for the new warehouse
       setTimeout(() => {
         handleEditServiceArea(warehouseId);
       }, 500);
     } catch (error) {
       console.error("Error creating warehouse:", error);
-      alert("Failed to create warehouse. Please try again.");
+      toast.error("Creation Failed", {
+        description: "Failed to create warehouse. Please try again.",
+        icon: <AlertCircle className="w-4 h-4" />,
+        duration: 5000,
+      });
     }
   };
 
@@ -298,6 +518,21 @@ export default function ForwarderServiceAreasPage() {
               <p className="text-yellow-800">
                 Click "Add Warehouse" above to create your first warehouse location.
               </p>
+            </div>
+          </div>
+        )}
+
+        {forwarderData.warehouses.length > 0 && forwarderData.warehouses.some(w => !w.serviceAreas || w.serviceAreas.length === 0) && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+            <div className="flex items-start">
+              <AlertCircle className="h-5 w-5 text-blue-600 mr-2 mt-0.5" />
+              <div>
+                <p className="text-blue-900 font-medium">Configure Service Areas Required</p>
+                <p className="text-blue-800 text-sm mt-1">
+                  Your warehouses need service area configuration to appear in customer order searches. 
+                  Click "Edit Warehouse" on each warehouse to configure which countries/regions they can accept packages from.
+                </p>
+              </div>
             </div>
           </div>
         )}
@@ -779,7 +1014,9 @@ export default function ForwarderServiceAreasPage() {
               {/* Basic Warehouse Details */}
               <div className="border border-gray-200 rounded-lg p-4">
                 <h3 className="text-lg font-medium text-gray-900 mb-4">Warehouse Details</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                
+                {/* Step 1: Basic Info */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Warehouse Name</label>
                     <input
@@ -806,121 +1043,275 @@ export default function ForwarderServiceAreasPage() {
                       min="1"
                     />
                   </div>
-                  
-                  <div>
-                    {/* Address Input Method Toggle for Edit */}
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-sm font-medium text-gray-700">Address Input Method</span>
-                      <div className="flex items-center gap-1">
+                </div>
+
+                {/* Step 2: Country Selection (Priority) */}
+                <div className="border-t pt-6 mb-6">
+                  <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
+                    <span className="bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">1</span>
+                    Select Country First
+                  </h4>
+                  <div className="max-w-md">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Country *</label>
+                    <select
+                      value={editingWarehouseData.countryCode || ""}
+                      onChange={(e) => {
+                        const countryCode = e.target.value;
+                        const country = allCountries.find(c => c.code === countryCode);
+                        const countryName = country?.name || "";
+                        
+                        setEditingWarehouseData({
+                          ...editingWarehouseData,
+                          country: countryName,
+                          countryCode: countryCode,
+                          // Reset state when country changes
+                          state: "",
+                          stateCode: "",
+                        });
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="">Select Country</option>
+                      {allCountries.map(country => (
+                        <option key={country.code} value={country.code}>
+                          {country.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Step 3: Address Details (Only after country selected) */}
+                {editingWarehouseData.country && (
+                  <div className="border-t pt-6">
+                    <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
+                      <span className="bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">2</span>
+                      Address Details
+                    </h4>
+                    
+                    {/* Address Input Method Toggle */}
+                    <div className="flex items-center justify-between mb-4">
+                      <span className="text-sm font-medium text-gray-700">How would you like to enter the address?</span>
+                      <div className="flex items-center gap-2">
                         <button
                           type="button"
                           onClick={() => setUseGoogleAutocompleteEdit(true)}
-                          className={`px-2 py-1 text-xs rounded transition-colors ${
+                          className={`px-3 py-1 text-xs rounded-md transition-colors ${
                             useGoogleAutocompleteEdit 
                               ? 'bg-blue-600 text-white' 
                               : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                           }`}
                         >
                           <Search className="w-3 h-3 mr-1" />
-                          Smart
+                          Smart Search
                         </button>
                         <button
                           type="button"
                           onClick={() => setUseGoogleAutocompleteEdit(false)}
-                          className={`px-2 py-1 text-xs rounded transition-colors ${
+                          className={`px-3 py-1 text-xs rounded-md transition-colors ${
                             !useGoogleAutocompleteEdit 
                               ? 'bg-blue-600 text-white' 
                               : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                           }`}
                         >
                           <PenTool className="w-3 h-3 mr-1" />
-                          Manual
+                          Manual Entry
                         </button>
                       </div>
                     </div>
 
-                    {useGoogleAutocompleteEdit ? (
-                      // Google Places Autocomplete for edit
-                      <AddressAutocomplete
-                        label="Street Address"
-                        placeholder="Start typing warehouse address"
-                        value={editingWarehouseData.address}
-                        onChange={(value) => setEditingWarehouseData({
-                          ...editingWarehouseData,
-                          address: value
-                        })}
-                        onAddressSelect={handleGoogleAddressSelectEdit}
-                        countryBias={editingWarehouseData.countryCode && editingWarehouseData.countryCode !== '' ? editingWarehouseData.countryCode : undefined}
-                        className="w-full"
-                      />
-                    ) : (
-                      // Manual address input for edit
-                      <>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Street Address</label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Address Input */}
+                      <div className="md:col-span-2">
+                        {useGoogleAutocompleteEdit ? (
+                          <AddressAutocomplete
+                            label="Street Address"
+                            placeholder={`Start typing warehouse address in ${editingWarehouseData.country}`}
+                            value={editingWarehouseData.address}
+                            onChange={(value) => setEditingWarehouseData({
+                              ...editingWarehouseData,
+                              address: value
+                            })}
+                            onAddressSelect={handleGoogleAddressSelectEdit}
+                            countryBias={editingWarehouseData.countryCode}
+                            className="w-full"
+                          />
+                        ) : (
+                          <>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Street Address</label>
+                            <input
+                              type="text"
+                              value={editingWarehouseData.address}
+                              onChange={(e) => setEditingWarehouseData({
+                                ...editingWarehouseData,
+                                address: e.target.value
+                              })}
+                              placeholder="123 Warehouse Street"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            />
+                          </>
+                        )}
+                      </div>
+                      
+                      {/* City */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">City</label>
                         <input
                           type="text"
-                          value={editingWarehouseData.address}
+                          value={editingWarehouseData.city}
                           onChange={(e) => setEditingWarehouseData({
                             ...editingWarehouseData,
-                            address: e.target.value
+                            city: e.target.value
                           })}
+                          placeholder="Paris"
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         />
-                      </>
-                    )}
+                      </div>
+
+                      {/* State/Province */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          State/Province{editingWarehouseData.countryCode && getStatesForCountry(editingWarehouseData.countryCode).length > 0 ? ' *' : ''}
+                        </label>
+                        {(() => {
+                          const availableStatesEdit = editingWarehouseData.countryCode ? getStatesForCountry(editingWarehouseData.countryCode) : [];
+                          
+                          if (availableStatesEdit.length > 0) {
+                            return (
+                              <select
+                                value={(() => {
+                                  // Try to find state by name first (for Google autofill), then by code
+                                  const stateByName = availableStatesEdit.find(s => s.name === editingWarehouseData.state);
+                                  const stateByCode = availableStatesEdit.find(s => s.code === editingWarehouseData.stateCode);
+                                  return stateByName?.code || stateByCode?.code || "";
+                                })()}
+                                onChange={(e) => {
+                                  const stateCode = e.target.value;
+                                  const selectedState = availableStatesEdit.find(s => s.code === stateCode);
+                                  setEditingWarehouseData({
+                                    ...editingWarehouseData,
+                                    state: selectedState?.name || "",
+                                    stateCode: stateCode,
+                                  });
+                                }}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                              >
+                                <option value="">Select State/Province</option>
+                                {availableStatesEdit.map(state => (
+                                  <option key={state.code} value={state.code}>
+                                    {state.name}
+                                  </option>
+                                ))}
+                              </select>
+                            );
+                          } else {
+                            return (
+                              <input
+                                type="text"
+                                value={editingWarehouseData.state}
+                                onChange={(e) => setEditingWarehouseData({
+                                  ...editingWarehouseData,
+                                  state: e.target.value
+                                })}
+                                placeholder="Enter state/province"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                              />
+                            );
+                          }
+                        })()}
+                      </div>
+
+                      {/* Postal Code */}
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Postal Code</label>
+                        <input
+                          type="text"
+                          value={editingWarehouseData.postalCode}
+                          onChange={(e) => setEditingWarehouseData({
+                            ...editingWarehouseData,
+                            postalCode: e.target.value
+                          })}
+                          placeholder="75001"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {!editingWarehouseData.country && (
+                  <div className="border-t pt-6">
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
+                      <p className="text-gray-600 text-sm">
+                        Please select a country first to continue with address details
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Simplified Service Area Configuration */}
+              <div className="border border-gray-200 rounded-lg p-4">
+                <h3 className="text-lg font-medium text-gray-900 mb-4">Service Area Coverage</h3>
+                
+                <SimpleServiceAreas
+                  warehouse={{
+                    _id: editingWarehouse,
+                    name: editingWarehouseData.name,
+                    country: editingWarehouseData.country,
+                    city: editingWarehouseData.city,
+                    state: editingWarehouseData.state
+                  }}
+                  currentServiceAreas={simpleServiceAreas}
+                  onChange={(serviceAreas) => {
+                    setSimpleServiceAreas(serviceAreas);
+                  }}
+                />
+                
+                {/* Additional Settings */}
+                <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Handling Time (Hours)
+                    </label>
+                    <input
+                      type="number"
+                      value={handlingTimeHours}
+                      onChange={(e) => setHandlingTimeHours(parseInt(e.target.value) || 24)}
+                      min="1"
+                      max="168"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Time to process packages from this area</p>
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">City</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Additional Fees ($)
+                    </label>
                     <input
-                      type="text"
-                      value={editingWarehouseData.city}
-                      onChange={(e) => setEditingWarehouseData({
-                        ...editingWarehouseData,
-                        city: e.target.value
-                      })}
+                      type="number"
+                      value={additionalFees}
+                      onChange={(e) => setAdditionalFees(parseFloat(e.target.value) || 0)}
+                      min="0"
+                      step="0.01"
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     />
+                    <p className="text-xs text-gray-500 mt-1">Extra cost for this service area</p>
                   </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">State/Province</label>
-                    <input
-                      type="text"
-                      value={editingWarehouseData.state}
-                      onChange={(e) => setEditingWarehouseData({
-                        ...editingWarehouseData,
-                        state: e.target.value
-                      })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Country</label>
-                    <input
-                      type="text"
-                      value={editingWarehouseData.country}
-                      onChange={(e) => setEditingWarehouseData({
-                        ...editingWarehouseData,
-                        country: e.target.value
-                      })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
-                  
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Postal Code</label>
-                    <input
-                      type="text"
-                      value={editingWarehouseData.postalCode}
-                      onChange={(e) => setEditingWarehouseData({
-                        ...editingWarehouseData,
-                        postalCode: e.target.value
-                      })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Special Instructions
+                  </label>
+                  <textarea
+                    value={specialInstructions}
+                    onChange={(e) => setSpecialInstructions(e.target.value)}
+                    placeholder="Any special handling instructions for packages from these areas..."
+                    rows={2}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
                 </div>
               </div>
 
@@ -958,6 +1349,16 @@ export default function ForwarderServiceAreasPage() {
           </div>
         </div>
       )}
+      
+      {/* Custom Notification */}
+      <Notification
+        type={notification.type}
+        title={notification.title}
+        description={notification.description}
+        show={notification.show}
+        onClose={() => setNotification(prev => ({ ...prev, show: false }))}
+        duration={5000}
+      />
     </div>
   );
 }

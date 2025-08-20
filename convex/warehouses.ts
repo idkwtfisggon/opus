@@ -15,13 +15,13 @@ export const createWarehouse = mutation({
     maxWeightKg: v.number(),
     maxDimensionsCm: v.string(),
     operatingHours: v.optional(v.object({
-      monday: v.optional(v.object({ open: v.string(), close: v.string(), closed: v.optional(v.boolean()) })),
-      tuesday: v.optional(v.object({ open: v.string(), close: v.string(), closed: v.optional(v.boolean()) })),
-      wednesday: v.optional(v.object({ open: v.string(), close: v.string(), closed: v.optional(v.boolean()) })),
-      thursday: v.optional(v.object({ open: v.string(), close: v.string(), closed: v.optional(v.boolean()) })),
-      friday: v.optional(v.object({ open: v.string(), close: v.string(), closed: v.optional(v.boolean()) })),
-      saturday: v.optional(v.object({ open: v.string(), close: v.string(), closed: v.optional(v.boolean()) })),
-      sunday: v.optional(v.object({ open: v.string(), close: v.string(), closed: v.optional(v.boolean()) })),
+      monday: v.optional(v.object({ open: v.optional(v.string()), close: v.optional(v.string()), closed: v.optional(v.boolean()) })),
+      tuesday: v.optional(v.object({ open: v.optional(v.string()), close: v.optional(v.string()), closed: v.optional(v.boolean()) })),
+      wednesday: v.optional(v.object({ open: v.optional(v.string()), close: v.optional(v.string()), closed: v.optional(v.boolean()) })),
+      thursday: v.optional(v.object({ open: v.optional(v.string()), close: v.optional(v.string()), closed: v.optional(v.boolean()) })),
+      friday: v.optional(v.object({ open: v.optional(v.string()), close: v.optional(v.string()), closed: v.optional(v.boolean()) })),
+      saturday: v.optional(v.object({ open: v.optional(v.string()), close: v.optional(v.string()), closed: v.optional(v.boolean()) })),
+      sunday: v.optional(v.object({ open: v.optional(v.string()), close: v.optional(v.string()), closed: v.optional(v.boolean()) })),
     })),
     holidaySchedule: v.optional(v.array(v.object({
       name: v.string(),
@@ -44,8 +44,8 @@ export const createWarehouse = mutation({
       wednesday: { open: "09:00", close: "17:00" },
       thursday: { open: "09:00", close: "17:00" },
       friday: { open: "09:00", close: "17:00" },
-      saturday: { closed: true },
-      sunday: { closed: true },
+      saturday: { closed: true, open: "", close: "" },
+      sunday: { closed: true, open: "", close: "" },
     };
     
     const warehouseId = await ctx.db.insert("warehouses", {
@@ -88,13 +88,13 @@ export const updateWarehouse = mutation({
     maxWeightKg: v.optional(v.number()),
     maxDimensionsCm: v.optional(v.string()),
     operatingHours: v.optional(v.object({
-      monday: v.optional(v.object({ open: v.string(), close: v.string(), closed: v.optional(v.boolean()) })),
-      tuesday: v.optional(v.object({ open: v.string(), close: v.string(), closed: v.optional(v.boolean()) })),
-      wednesday: v.optional(v.object({ open: v.string(), close: v.string(), closed: v.optional(v.boolean()) })),
-      thursday: v.optional(v.object({ open: v.string(), close: v.string(), closed: v.optional(v.boolean()) })),
-      friday: v.optional(v.object({ open: v.string(), close: v.string(), closed: v.optional(v.boolean()) })),
-      saturday: v.optional(v.object({ open: v.string(), close: v.string(), closed: v.optional(v.boolean()) })),
-      sunday: v.optional(v.object({ open: v.string(), close: v.string(), closed: v.optional(v.boolean()) })),
+      monday: v.optional(v.object({ open: v.optional(v.string()), close: v.optional(v.string()), closed: v.optional(v.boolean()) })),
+      tuesday: v.optional(v.object({ open: v.optional(v.string()), close: v.optional(v.string()), closed: v.optional(v.boolean()) })),
+      wednesday: v.optional(v.object({ open: v.optional(v.string()), close: v.optional(v.string()), closed: v.optional(v.boolean()) })),
+      thursday: v.optional(v.object({ open: v.optional(v.string()), close: v.optional(v.string()), closed: v.optional(v.boolean()) })),
+      friday: v.optional(v.object({ open: v.optional(v.string()), close: v.optional(v.string()), closed: v.optional(v.boolean()) })),
+      saturday: v.optional(v.object({ open: v.optional(v.string()), close: v.optional(v.string()), closed: v.optional(v.boolean()) })),
+      sunday: v.optional(v.object({ open: v.optional(v.string()), close: v.optional(v.string()), closed: v.optional(v.boolean()) })),
     })),
     holidaySchedule: v.optional(v.array(v.object({
       name: v.string(),

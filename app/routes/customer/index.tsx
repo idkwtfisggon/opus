@@ -73,7 +73,9 @@ export default function CustomerDashboard() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 mb-2">
-              Welcome back, {customer.name || customer.firstName || "Customer"}!
+              Welcome back, {customer.firstName && customer.lastName 
+                ? `${customer.firstName} ${customer.lastName}` 
+                : customer.firstName || customer.name || "Customer"}!
             </h1>
             <p className="text-gray-600">Track your international shipments and manage your orders</p>
           </div>
