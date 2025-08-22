@@ -24,6 +24,7 @@ export default [
   route("api/webhooks/mailgun", "routes/api/webhooks/mailgun.ts"),
   route("api/places/autocomplete", "routes/api/places/autocomplete.ts"),
   route("api/places/details", "routes/api/places/details.ts"),
+  route("api/extension/auth", "routes/api/extension/auth.ts"),
   layout("routes/dashboard/layout.tsx", [
     route("dashboard", "routes/dashboard/index.tsx"),
     route("dashboard/chat", "routes/dashboard/chat.tsx"),

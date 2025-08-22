@@ -28,8 +28,11 @@ export default function CustomerOrders({ loaderData }: Route.ComponentProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
-  // Get real orders from Convex
-  const ordersData = useQuery(api.orders.getCustomerOrders, {});
+  // Get real orders from Convex (authentication handled in Convex function)
+  const ordersData = useQuery(api.orders.getCustomerOrders, {
+    limit: 50,
+    offset: 0
+  });
   const orders = ordersData?.orders || [];
   const isLoading = ordersData === undefined;
 
