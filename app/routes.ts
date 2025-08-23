@@ -25,6 +25,7 @@ export default [
   route("api/places/autocomplete", "routes/api/places/autocomplete.ts"),
   route("api/places/details", "routes/api/places/details.ts"),
   route("api/extension/auth", "routes/api/extension/auth.ts"),
+  route("api/extension/login", "routes/api/extension/login.ts"),
   layout("routes/dashboard/layout.tsx", [
     route("dashboard", "routes/dashboard/index.tsx"),
     route("dashboard/chat", "routes/dashboard/chat.tsx"),

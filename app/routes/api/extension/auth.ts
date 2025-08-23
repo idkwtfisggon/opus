@@ -1,91 +1,89 @@
-import { getAuth } from "@clerk/react-router/ssr.server";
-import { createClerkClient } from "@clerk/clerk-sdk-node";
 import type { Route } from "./+types/auth";
 
-export async function loader({ request }: Route.LoaderArgs) {
-  try {
-    // Add CORS headers specifically for extension
-    const headers = new Headers({
-      "Access-Control-Allow-Origin": "chrome-extension://*", // Allow extension
-      "Access-Control-Allow-Methods": "GET, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization",
-      "Access-Control-Allow-Credentials": "true",
-      "Content-Type": "application/json"
-    });
+const EXTENSION_ORIGIN = process.env.EXTENSION_ORIGIN || "chrome-extension://*";
+const BASE_HEADERS = {
+  "Access-Control-Allow-Origin": EXTENSION_ORIGIN,
+  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  "Content-Type": "application/json",
+  "Cache-Control": "no-store",
+} as const;
 
-    // Handle preflight
-    if (request.method === "OPTIONS") {
-      return new Response(null, { status: 200, headers });
+export async function loader({ request }: Route.LoaderArgs) {
+  const headers = new Headers(BASE_HEADERS);
+
+  if (request.method === "OPTIONS") {
+    return new Response(null, { status: 200, headers });
+  }
+
+  try {
+    if (!process.env.CLERK_SECRET_KEY) {
+      return new Response(
+        JSON.stringify({ error: "Server misconfigured" }),
+        { status: 500, headers }
+      );
     }
 
-    // Get user from Clerk
-    const { userId } = await getAuth({ request });
-
-    if (!userId) {
+    const authHeader = request.headers.get("Authorization");
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return new Response(
-        JSON.stringify({ authenticated: false, error: "Not authenticated" }),
+        JSON.stringify({ error: "Missing authorization header" }),
         { status: 401, headers }
       );
     }
 
-    // Get user from Clerk API
-    const clerkUser = await createClerkClient({
-      secretKey: process.env.CLERK_SECRET_KEY
-    }).users.getUser(userId);
-
-    // Check role from user metadata
-    const userRole = clerkUser.publicMetadata?.role || 'customer';
-
-    // Only allow customers
-    if (userRole !== 'customer') {
+    const sessionId = authHeader.slice(7).trim();
+    if (!sessionId) {
       return new Response(
-        JSON.stringify({
-          authenticated: false,
-          error: `Access denied. Only customer accounts can use this extension. Your role: ${userRole}`
-        }),
-        { status: 403, headers }
+        JSON.stringify({ error: "Invalid session" }),
+        { status: 401, headers }
+      );
+    }
+
+    const clerkResponse = await fetch(`https://api.clerk.com/v1/sessions/${sessionId}`, {
+      headers: {
+        "Authorization": `Bearer ${process.env.CLERK_SECRET_KEY}`
+      }
+    });
+
+    if (!clerkResponse.ok) {
+      return new Response(
+        JSON.stringify({ error: "Invalid session" }),
+        { status: 401, headers }
+      );
+    }
+
+    const sessionData = await clerkResponse.json();
+
+    if (sessionData.status === "active") {
+      return new Response(
+        JSON.stringify({ ok: true, userId: sessionData.user_id }),
+        { status: 200, headers }
       );
     }
 
     return new Response(
-      JSON.stringify({
-        authenticated: true,
-        user: {
-          id: userId,
-          email: clerkUser.primaryEmailAddress?.emailAddress,
-          firstName: clerkUser.firstName,
-          lastName: clerkUser.lastName,
-          role: userRole
-        }
-      }),
-      { headers }
+      JSON.stringify({ error: "Invalid session" }),
+      { status: 401, headers }
     );
 
   } catch (error) {
-    console.error("Extension auth error:", error);
     return new Response(
-      JSON.stringify({ authenticated: false, error: "Authentication failed" }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
+      JSON.stringify({ error: "Authentication failed" }),
+      { status: 500, headers }
     );
   }
 }
 
-// Handle OPTIONS requests for CORS
 export async function action({ request }: Route.ActionArgs) {
+  const headers = new Headers(BASE_HEADERS);
+
   if (request.method === "OPTIONS") {
-    return new Response(null, {
-      status: 200,
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization",
-        "Access-Control-Allow-Credentials": "true",
-      },
-    });
+    return new Response(null, { status: 200, headers });
   }
-  
+
   return new Response(
-    JSON.stringify({ error: "Method not allowed" }), 
-    { status: 405, headers: { "Content-Type": "application/json" } }
+    JSON.stringify({ error: "Method not allowed" }),
+    { status: 405, headers }
   );
 }
