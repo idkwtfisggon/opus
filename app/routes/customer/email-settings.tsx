@@ -1,5 +1,6 @@
 import type { Route } from "./+types/email-settings";
-import { getAuth } from "@clerk/react-router/ssr.server";
+import { getServerAuth } from "~/contexts/auth";
+import { redirect } from "react-router";
 import { fetchQuery } from "convex/nextjs";
 import { api } from "../../../convex/_generated/api";
 import EmailManager from "../../components/customer/EmailManager";
@@ -13,10 +14,10 @@ export function meta({}: Route.MetaArgs) {
 }
 
 export async function loader(args: Route.LoaderArgs) {
-  const { userId } = await getAuth(args);
+  const { userId } = await getServerAuth(args.request);
   
   if (!userId) {
-    throw new Response("Unauthorized", { status: 401 });
+    return redirect("/sign-in");
   }
 
   try {

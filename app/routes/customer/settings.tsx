@@ -1,5 +1,5 @@
 import type { Route } from "./+types/settings";
-import { getAuth } from "@clerk/react-router/ssr.server";
+import { getServerAuth } from "~/contexts/auth";
 import { redirect } from "react-router";
 import { Settings as SettingsIcon, Package, MapPin, CreditCard, Bell, Shield, Globe, Palette, Plus, Edit2, Trash2, CheckCircle, AlertCircle, Info, X, Lightbulb, Search, PenTool } from "lucide-react";
 import React, { useState } from "react";
@@ -15,7 +15,7 @@ import { validateFullAddress, getAllCountries, getStatesForCountry, type Address
 import AddressAutocomplete from "~/components/ui/AddressAutocomplete";
 
 export async function loader(args: Route.LoaderArgs) {
-  const { userId } = await getAuth(args);
+  const { userId } = await getServerAuth(args.request);
   
   if (!userId) {
     return redirect("/sign-in");

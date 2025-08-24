@@ -1,4 +1,5 @@
-import { getAuth } from "@clerk/react-router/ssr.server";
+import { getServerAuth } from "~/contexts/auth";
+import { redirect } from "react-router";
 import { fetchQuery } from "convex/nextjs";
 import type { Route } from "./+types/orders";
 import { api } from "../../../convex/_generated/api";
@@ -8,20 +9,46 @@ import { Truck, Trash2 } from "lucide-react";
 import ShippingRatesModal from "../../components/courier/ShippingRatesModal";
 
 export async function loader(args: Route.LoaderArgs) {
-  const { userId } = await getAuth(args);
+  const { userId } = await getServerAuth(args.request);
   
   if (!userId) {
-    throw new Response("Unauthorized", { status: 401 });
+    return redirect("/sign-in");
   }
 
-  return { userId };
+  try {
+    // Get forwarder data
+    const forwarder = await fetchQuery(api.forwarders.getForwarderByUserId, { userId });
+    
+    if (!forwarder) {
+      return redirect("/onboarding");
+    }
+
+    // Get all data server-side
+    const [allOrders, warehouses, serviceAreas] = await Promise.all([
+      fetchQuery(api.orders.getRecentOrders, { forwarderId: forwarder._id, limit: 1000 }),
+      fetchQuery(api.warehouses.getForwarderWarehouses, { forwarderId: forwarder._id }),
+      fetchQuery(api.warehouseServiceAreas.getForwarderServiceAreas, {})
+    ]);
+
+    return { 
+      userId,
+      forwarder,
+      allOrders,
+      warehouses,
+      forwarderData: {
+        forwarder,
+        warehouses,
+        serviceAreas
+      }
+    };
+  } catch (error) {
+    console.error("Error loading orders data:", error);
+    return redirect("/sign-in");
+  }
 }
 
 export default function ManageOrders({ loaderData }: Route.ComponentProps) {
-  const { userId } = loaderData;
-  
-  // Get forwarder data with warehouses and service areas
-  const forwarderData = useQuery(api.warehouseServiceAreas.getForwarderServiceAreas);
+  const { userId, forwarder, allOrders, warehouses, forwarderData } = loaderData;
   
   const [isCreating, setIsCreating] = useState(false);
   const [deletingOrderId, setDeletingOrderId] = useState<string | null>(null);
@@ -29,20 +56,9 @@ export default function ManageOrders({ loaderData }: Route.ComponentProps) {
   const updateOrderStatus = useMutation(api.orders.updateOrderStatus);
   const deleteOrder = useMutation(api.orders.deleteOrder);
   
-  const forwarder = forwarderData?.forwarder;
-  const warehouses = forwarderData?.warehouses || [];
   const firstWarehouse = warehouses[0] || null;
 
-  // Get ALL orders for this forwarder using the same query as dashboard
-  const allOrders = useQuery(
-    api.orders.getRecentOrders,
-    forwarderData?.forwarder ? { 
-      forwarderId: forwarderData.forwarder._id,
-      limit: 1000 // Get all orders
-    } : "skip"
-  );
-
-  // Get parcel conditions for verification status checking
+  // Get parcel conditions for verification status checking (keep this as client query)
   const allConditions = useQuery(
     api.parcelConditions.getConditionsRequiringReview,
     { warehouseId: firstWarehouse?._id }

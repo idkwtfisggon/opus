@@ -1,7 +1,7 @@
 import type { Route } from "./+types/orders";
 import { Package, Search, Filter, Eye } from "lucide-react";
 import React, { useState } from "react";
-import { getAuth } from "@clerk/react-router/ssr.server";
+import { getServerAuth } from "~/contexts/auth";
 import { redirect } from "react-router";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -14,7 +14,7 @@ export function meta({}: Route.MetaArgs) {
 }
 
 export async function loader(args: Route.LoaderArgs) {
-  const { userId } = await getAuth(args);
+  const { userId } = await getServerAuth(args.request);
   
   if (!userId) {
     return redirect("/sign-in");

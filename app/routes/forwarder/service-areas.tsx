@@ -2,6 +2,9 @@ import type { Route } from "./+types/service-areas";
 import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
+import { getServerAuth } from "~/contexts/auth";
+import { redirect } from "react-router";
+import { fetchQuery } from "convex/nextjs";
 import { MapPin, Plus, Edit, Trash2, Globe, Clock, DollarSign, AlertCircle, Save, X, Search, PenTool, CheckCircle } from "lucide-react";
 import { getAllCountries, getStatesForCountry, basicAddressShape, getCountryCode } from "../../utils/addressValidation";
 import WarehouseOperatingHours from "../../components/warehouse/WarehouseOperatingHours";
@@ -16,8 +19,40 @@ export function meta({}: Route.MetaArgs) {
   ];
 }
 
+export async function loader(args: Route.LoaderArgs) {
+  const { userId } = await getServerAuth(args.request);
+  
+  if (!userId) {
+    return redirect("/sign-in");
+  }
 
-export default function ForwarderServiceAreasPage() {
+  try {
+    // Get forwarder data
+    const forwarder = await fetchQuery(api.forwarders.getForwarderByUserId, { userId });
+    
+    if (!forwarder) {
+      return redirect("/onboarding");
+    }
+
+    // Get warehouses and service areas server-side
+    const [warehouses, serviceAreas] = await Promise.all([
+      fetchQuery(api.warehouses.getForwarderWarehouses, { forwarderId: forwarder._id }),
+      fetchQuery(api.warehouseServiceAreas.getForwarderServiceAreas, {})
+    ]);
+
+    return { 
+      userId,
+      forwarder,
+      warehouses,
+      serviceAreas
+    };
+  } catch (error) {
+    console.error("Error loading service areas data:", error);
+    return redirect("/sign-in");
+  }
+}
+
+export default function ForwarderServiceAreasPage({ loaderData }: Route.ComponentProps) {
   const [editingWarehouse, setEditingWarehouse] = useState<string | null>(null);
   const [editingWarehouseData, setEditingWarehouseData] = useState<any>(null);
   const [editingOperatingHours, setEditingOperatingHours] = useState<any>(null);
@@ -133,7 +168,8 @@ export default function ForwarderServiceAreasPage() {
   };
 
   // Get forwarder data with warehouses and service areas
-  const forwarderData = useQuery(api.warehouseServiceAreas.getForwarderServiceAreas);
+  const { forwarder, warehouses, serviceAreas } = loaderData;
+  const forwarderData = { forwarder, warehouses, serviceAreas };
   
   // Get shipping settings (zones and rates) for the forwarder
   const shippingSettings = useQuery(

@@ -7,26 +7,26 @@ import {
   ScrollRestoration,
 } from "react-router";
 
-import { ClerkProvider, useAuth } from "@clerk/react-router";
-import { rootAuthLoader } from "@clerk/react-router/ssr.server";
 import { ConvexReactClient } from "convex/react";
-import { ConvexProviderWithClerk } from "convex/react-clerk";
+import { ConvexProvider, ConvexProviderWithAuth } from "convex/react";
 import type { Route } from "./+types/root";
 import "./app.css";
 import { Analytics } from "@vercel/analytics/react";
 import { Toaster } from "sonner";
+import { AuthProvider, useAuth } from "./contexts/auth";
 
 const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL as string);
 
 export async function loader(args: Route.LoaderArgs) {
-  return rootAuthLoader(args);
+  // No longer need Clerk's rootAuthLoader
+  return {};
 }
 export const links: Route.LinksFunction = () => [
   // DNS prefetch for external services
   { rel: "dns-prefetch", href: "https://fonts.googleapis.com" },
   { rel: "dns-prefetch", href: "https://fonts.gstatic.com" },
   { rel: "dns-prefetch", href: "https://api.convex.dev" },
-  { rel: "dns-prefetch", href: "https://clerk.dev" },
+  { rel: "dns-prefetch", href: "https://jjdnkskwcmdndktrejws.supabase.co" },
   
   // Preconnect to font services
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -89,22 +89,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function App({ loaderData }: Route.ComponentProps) {
+export default function App() {
   return (
-    <ClerkProvider
-      loaderData={loaderData}
-      signUpFallbackRedirectUrl="/onboarding"
-      signInFallbackRedirectUrl="/onboarding"
-    >
-      <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
+    <AuthProvider>
+      <ConvexProvider client={convex}>
         <Outlet />
         <Toaster 
           position="top-right"
           richColors
           closeButton
         />
-      </ConvexProviderWithClerk>
-    </ClerkProvider>
+      </ConvexProvider>
+    </AuthProvider>
   );
 }
 

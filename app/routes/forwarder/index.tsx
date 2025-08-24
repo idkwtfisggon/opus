@@ -1,7 +1,8 @@
-import { getAuth } from "@clerk/react-router/ssr.server";
 import { fetchQuery } from "convex/nextjs";
 import type { Route } from "./+types/index";
 import { api } from "../../../convex/_generated/api";
+import { getServerAuth } from "~/contexts/auth";
+import { redirect } from "react-router";
 import ForwarderOnboarding from "~/components/forwarder/ForwarderOnboarding";
 import OrderVolumeChart from "~/components/analytics/OrderVolumeChart";
 import CreateTestOrders from "~/components/debug/CreateTestOrders";
@@ -9,10 +10,10 @@ import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 
 export async function loader(args: Route.LoaderArgs) {
-  const { userId } = await getAuth(args);
+  const { userId } = await getServerAuth(args.request);
   
   if (!userId) {
-    throw new Response("Unauthorized", { status: 401 });
+    return redirect("/sign-in");
   }
 
   try {
@@ -30,11 +31,13 @@ export async function loader(args: Route.LoaderArgs) {
       };
     }
 
-    // Get real stats, orders, and warehouses
-    const [stats, recentOrders, warehouses] = await Promise.all([
+    // Get real stats, orders, warehouses, and staff
+    const [stats, recentOrders, warehouses, staff, warehouseData] = await Promise.all([
       fetchQuery(api.orders.getForwarderStats, { forwarderId: forwarder._id }),
       fetchQuery(api.orders.getRecentOrders, { forwarderId: forwarder._id, limit: 5 }),
-      fetchQuery(api.warehouses.getForwarderWarehouses, { forwarderId: forwarder._id })
+      fetchQuery(api.warehouses.getForwarderWarehouses, { forwarderId: forwarder._id }),
+      fetchQuery(api.staff.getForwarderStaff, { forwarderId: forwarder._id }),
+      fetchQuery(api.warehouseServiceAreas.getForwarderServiceAreas, {})
     ]);
 
     return {
@@ -42,6 +45,9 @@ export async function loader(args: Route.LoaderArgs) {
       forwarder,
       stats,
       recentOrders,
+      warehouses,
+      staff,
+      warehouseData,
       firstWarehouse: warehouses[0] || null
     };
   } catch (error) {
@@ -57,43 +63,12 @@ export async function loader(args: Route.LoaderArgs) {
 }
 
 export default function ForwarderDashboard({ loaderData }: Route.ComponentProps) {
-  const { hasForwarderProfile, userId, stats, recentOrders, forwarder } = loaderData;
+  const { hasForwarderProfile, userId, stats, recentOrders, forwarder, warehouses, staff, warehouseData } = loaderData;
   const [showOnboarding, setShowOnboarding] = useState(!hasForwarderProfile);
   
-  // Get real-time performance metrics
-  const performanceMetrics = useQuery(
-    api.analytics.getPerformanceMetrics, 
-    forwarder ? { forwarderId: forwarder._id } : "skip"
-  );
-  
-  // Get warehouse capacity data
-  const warehouseData = useQuery(
-    api.warehouseServiceAreas.getForwarderServiceAreas
-  );
-  
-  // Get current orders to calculate warehouse usage
-  const currentOrders = useQuery(
-    api.orders.getRecentOrders,
-    forwarder ? { 
-      forwarderId: forwarder._id,
-      limit: 1000 // Get all orders to calculate current capacity
-    } : "skip"
-  );
-
-  // Get staff activity for the dashboard
-  const staffActivity = useQuery(
-    api.orderStatusHistory.getRecentStatusUpdates,
-    forwarder ? { 
-      forwarderId: forwarder._id,
-      limit: 10 // Show last 10 status updates
-    } : "skip"
-  );
-
-  // Get staff performance metrics
-  const staffMetrics = useQuery(
-    api.staff.getStaffPerformanceMetrics,
-    forwarder ? { forwarderId: forwarder._id } : "skip"
-  );
+  // Use server data instead of client queries
+  const currentOrders = recentOrders; // Use the orders from server
+  const staffMetrics = staff ? { totalStaff: staff.length } : null;
   
   // Timezone fix mutation - use the existing upsertForwarder instead
   const updateForwarder = useMutation(api.forwarders.upsertForwarder);
@@ -124,9 +99,9 @@ export default function ForwarderDashboard({ loaderData }: Route.ComponentProps)
   
   // Calculate warehouse capacity usage
   const getWarehouseCapacities = () => {
-    if (!warehouseData?.warehouses || !currentOrders) return [];
+    if (!warehouses || !currentOrders) return [];
     
-    return warehouseData.warehouses.map(warehouse => {
+    return warehouses.map(warehouse => {
       // Count active orders (not delivered) for this warehouse
       const activeOrders = currentOrders.filter(order => 
         order.warehouseId === warehouse._id && 

@@ -1,12 +1,11 @@
-import { getAuth } from "@clerk/react-router/ssr.server";
 import { fetchQuery } from "convex/nextjs";
 import { api } from "../../../convex/_generated/api";
 import { Outlet } from "react-router";
 import { redirect } from "react-router";
-import { useAuth } from "@clerk/react-router";
+import { getServerAuth, useAuth } from "~/contexts/auth";
 
 export async function loader(args: any) {
-  const { userId } = await getAuth(args);
+  const { userId, user } = await getServerAuth(args.request);
   
   if (!userId) {
     return redirect("/sign-in");

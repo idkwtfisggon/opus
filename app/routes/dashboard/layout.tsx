@@ -1,4 +1,4 @@
-import { getAuth } from "@clerk/react-router/ssr.server";
+import { getServerAuth } from "~/contexts/auth";
 import { fetchQuery } from "convex/nextjs";
 import { redirect, useLoaderData } from "react-router";
 import { AppSidebar } from "~/components/dashboard/app-sidebar";
@@ -10,11 +10,11 @@ import { createClerkClient } from "@clerk/react-router/api.server";
 import { Outlet } from "react-router";
 
 export async function loader(args: Route.LoaderArgs) {
-  const { userId } = await getAuth(args);
+  const { userId } = await getServerAuth(args.request);
 
   // Redirect to sign-in if not authenticated
   if (!userId) {
-    throw redirect("/sign-in");
+    return redirect("/sign-in");
   }
 
   // Parallel data fetching to reduce waterfall

@@ -1,66 +1,67 @@
-import { getAuth } from "@clerk/react-router/ssr.server";
 import { fetchQuery } from "convex/nextjs";
 import type { Route } from "./+types/layout";
 import { api } from "../../../convex/_generated/api";
 import { Outlet } from "react-router";
 import { redirect } from "react-router";
-import { useAuth } from "@clerk/react-router";
+import { getServerAuth, useAuth } from "~/contexts/auth";
 
 export async function loader(args: Route.LoaderArgs) {
-  const { userId } = await getAuth(args);
+  console.log("Customer layout: Checking auth...");
+  const { userId, user } = await getServerAuth(args.request);
   
-  if (!userId) {
+  console.log("Customer layout: Got userId:", userId, "user:", user);
+  
+  if (!userId || !user) {
+    console.log("Customer layout: No auth, redirecting to sign-in");
     return redirect("/sign-in");
   }
 
-  console.log("Customer layout loader: Starting with userId =", userId);
-  
-  // Add retry logic to handle timing issues after user creation
-  const maxRetries = 3;
-  let retryCount = 0;
-  
-  while (retryCount < maxRetries) {
-    try {
-      const user = await fetchQuery(api.users.findUserByToken, { tokenIdentifier: userId });
-      console.log(`Customer layout loader: Query result (attempt ${retryCount + 1}) =`, user);
-      
-      if (!user) {
-        console.log(`Customer layout loader: No user found (attempt ${retryCount + 1})`);
-        
-        if (retryCount < maxRetries - 1) {
-          // Wait before retrying
-          await new Promise(resolve => setTimeout(resolve, 500));
-          retryCount++;
-          continue;
-        } else {
-          console.log("Customer layout loader: Max retries reached, redirecting to onboarding");
-          return redirect("/onboarding");
-        }
-      }
-      
-      if (user.role !== "customer") {
-        console.log(`Customer layout loader: Wrong role ${user.role}, redirecting to /${user.role}`);
-        return redirect(`/${user.role}`);
-      }
-
-      console.log("Customer layout loader: Success, returning user");
-      return { user };
-    } catch (error) {
-      console.error(`Customer layout loader: Error (attempt ${retryCount + 1}) =`, error);
-      
-      if (retryCount < maxRetries - 1) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-        retryCount++;
-        continue;
-      } else {
-        console.log("Customer layout loader: Max retries reached due to errors, redirecting to onboarding");
-        return redirect("/onboarding");
-      }
-    }
+  // Check user role
+  const userRole = user.user_metadata?.role || 'customer';
+  if (userRole !== "customer") {
+    console.log(`Customer layout: Wrong role ${userRole}, redirecting to /${userRole}`);
+    return redirect(`/${userRole}`);
   }
-  
-  // This should never be reached, but just in case
-  return redirect("/onboarding");
+
+  // Try to get Convex user, but don't fail if it doesn't exist
+  try {
+    const convexUser = await fetchQuery(api.users.findUserByToken, { tokenIdentifier: userId });
+    console.log("Customer layout: Convex user found:", !!convexUser);
+    
+    if (convexUser) {
+      if (convexUser.role !== "customer") {
+        console.log(`Customer layout: Wrong convex role ${convexUser.role}, redirecting to /${convexUser.role}`);
+        return redirect(`/${convexUser.role}`);
+      }
+      return { user: convexUser };
+    } else {
+      // Create temporary user data if Convex user doesn't exist
+      console.log("Customer layout: No Convex user, using temp data");
+      return { 
+        user: { 
+          _id: userId,
+          role: 'customer', 
+          email: user.email, 
+          name: user.user_metadata?.username || user.email?.split('@')[0] || 'Customer',
+          firstName: user.user_metadata?.first_name,
+          lastName: user.user_metadata?.last_name
+        } 
+      };
+    }
+  } catch (error) {
+    console.error("Customer layout: Convex error:", error);
+    // Fallback to temp user data
+    return { 
+      user: { 
+        _id: userId,
+        role: 'customer', 
+        email: user.email, 
+        name: user.user_metadata?.username || user.email?.split('@')[0] || 'Customer',
+        firstName: user.user_metadata?.first_name,
+        lastName: user.user_metadata?.last_name
+      } 
+    };
+  }
 }
 
 export default function CustomerLayout() {

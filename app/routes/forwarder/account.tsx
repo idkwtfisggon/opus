@@ -1,8 +1,8 @@
-import { getAuth } from "@clerk/react-router/ssr.server";
+import { getServerAuth } from "~/contexts/auth";
 import { fetchQuery } from "convex/nextjs";
 import { redirect } from "react-router";
 import type { Route } from "./+types/account";
-import { useUser } from "@clerk/react-router";
+import { useAuth } from "~/contexts/auth";
 import { useState } from "react";
 import * as React from "react";
 import { useMutation, useQuery } from "convex/react";
@@ -16,7 +16,7 @@ import { UserCircle, Mail, Key, Shield, Bell, Trash2, Download, Eye, EyeOff, X }
 import { api } from "../../../convex/_generated/api";
 
 export async function loader(args: Route.LoaderArgs) {
-  const { userId } = await getAuth(args);
+  const { userId } = await getServerAuth(args.request);
   
   if (!userId) {
     return redirect("/sign-in");
@@ -40,7 +40,7 @@ export async function loader(args: Route.LoaderArgs) {
 }
 
 export default function ForwarderAccountSettings({ loaderData }: Route.ComponentProps) {
-  const { user } = useUser();
+  const { user } = useAuth();
   const { forwarder } = loaderData;
   
   // Real-time user data

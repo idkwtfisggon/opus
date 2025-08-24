@@ -85,3 +85,42 @@ export const createForwarderRecordsForUsers = mutation({
     return { created, message: `Created ${created} forwarder records` };
   },
 });
+
+// Fix the forwarder record with all the data to use the Supabase ID
+export const fixForwarderUserId = mutation({
+  handler: async (ctx) => {
+    // Find the forwarder with the old Clerk ID that has all the data
+    const oldForwarder = await ctx.db
+      .query("forwarders")
+      .filter((q) => q.eq(q.field("userId"), "user_30t46oUNZB9yniLtgUDOcqa9sCS"))
+      .first();
+    
+    if (!oldForwarder) {
+      return { success: false, message: "Old forwarder record not found" };
+    }
+    
+    console.log(`Found old forwarder: ${oldForwarder._id} with userId: ${oldForwarder.userId}`);
+    
+    // Update it to use the Supabase ID
+    await ctx.db.patch(oldForwarder._id, {
+      userId: "333e6599-2839-4eb8-b662-0b894fba37b2",
+      contactEmail: "benongyr@gmail.com",
+      updatedAt: Date.now(),
+    });
+    
+    console.log(`Updated forwarder ${oldForwarder._id} to use Supabase ID`);
+    
+    // Delete the empty new forwarder record
+    const newForwarder = await ctx.db
+      .query("forwarders")
+      .filter((q) => q.eq(q.field("businessName"), "Ben Forward Co"))
+      .first();
+    
+    if (newForwarder) {
+      await ctx.db.delete(newForwarder._id);
+      console.log(`Deleted empty forwarder record ${newForwarder._id}`);
+    }
+    
+    return { success: true, message: "Forwarder userId updated to Supabase ID" };
+  },
+});

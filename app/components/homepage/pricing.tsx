@@ -1,5 +1,5 @@
 "use client";
-import { useAuth } from "@clerk/react-router";
+import { useAuth } from "~/contexts/auth";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { Check, Loader2 } from "lucide-react";
 import { useState } from "react";

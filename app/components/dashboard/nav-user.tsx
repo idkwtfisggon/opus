@@ -1,4 +1,3 @@
-import { SignOutButton } from "@clerk/react-router";
 import {
   IconDotsVertical,
   IconLogout,
@@ -21,17 +20,25 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "~/components/ui/sidebar";
-import { useClerk } from "@clerk/react-router";
+import { useAuth } from "~/contexts/auth";
+import { useNavigate } from "react-router";
 
 export function NavUser({ user }: any) {
   const { isMobile } = useSidebar();
-  const userFullName = user.firstName + " " + user.lastName;
-  const userEmail = user.emailAddresses[0].emailAddress;
+  const { signOut } = useAuth();
+  const navigate = useNavigate();
+  
+  const userFullName = `${user?.user_metadata?.first_name || ''} ${user?.user_metadata?.last_name || ''}`.trim();
+  const userEmail = user?.email || '';
   const userInitials =
-    (user?.firstName?.charAt(0) || "").toUpperCase() +
-    (user?.lastName?.charAt(0) || "").toUpperCase();
-  const userProfile = user.imageUrl;
-  const { signOut } = useClerk();
+    (user?.user_metadata?.first_name?.charAt(0) || "").toUpperCase() +
+    (user?.user_metadata?.last_name?.charAt(0) || "").toUpperCase();
+  const userProfile = user?.user_metadata?.avatar_url || '';
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/');
+  };
 
   return (
     <SidebarMenu>
@@ -91,7 +98,7 @@ export function NavUser({ user }: any) {
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => signOut({ redirectUrl: "/" })}>
+            <DropdownMenuItem onClick={handleSignOut}>
               <IconLogout />
               Sign Out
             </DropdownMenuItem>

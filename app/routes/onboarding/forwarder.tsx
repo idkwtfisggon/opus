@@ -1,4 +1,4 @@
-import { getAuth } from "@clerk/react-router/ssr.server";
+import { getServerAuth } from "~/contexts/auth";
 import { fetchQuery } from "convex/nextjs";
 import { redirect } from "react-router";
 import type { Route } from "./+types/forwarder";
@@ -9,7 +9,7 @@ import { useUser } from "@clerk/react-router";
 import ForwarderOnboarding from "~/components/forwarder/ForwarderOnboarding";
 
 export async function loader(args: Route.LoaderArgs) {
-  const { userId } = await getAuth(args);
+  const { userId } = await getServerAuth(args.request);
   
   if (!userId) {
     return redirect("/sign-in");

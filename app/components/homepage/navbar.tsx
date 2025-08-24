@@ -1,10 +1,10 @@
 "use client";
-import { UserButton } from "@clerk/react-router";
-import { Github, Menu, X } from "lucide-react";
+import { Github, Menu, X, LogOut } from "lucide-react";
 import React, { useCallback } from "react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { Button } from "~/components/ui/button";
 import { cn } from "~/lib/utils";
+import { useAuth } from "~/contexts/auth";
 
 const menuItems = [
   { name: "Home", href: "#hero" },
@@ -20,6 +20,13 @@ export const Navbar = ({
 }) => {
   const [menuState, setMenuState] = React.useState(false);
   const [isScrolled, setIsScrolled] = React.useState(false);
+  const { signOut } = useAuth();
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/');
+  };
 
   React.useEffect(() => {
     const handleScroll = () => {
@@ -138,7 +145,15 @@ export const Navbar = ({
                         <span>{dashboardText}</span>
                       </Link>
                     </Button>
-                    <UserButton />
+                    <Button 
+                      onClick={handleSignOut}
+                      variant="outline" 
+                      size="sm"
+                      className="flex items-center gap-2"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      Sign Out
+                    </Button>
                   </div>
                 ) : (
                   <>

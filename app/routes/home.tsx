@@ -1,4 +1,4 @@
-import { getAuth } from "@clerk/react-router/ssr.server";
+import { getServerAuth } from "~/contexts/auth";
 import { fetchAction, fetchQuery } from "convex/nextjs";
 import { redirect } from "react-router";
 import ContentSection from "~/components/homepage/content";
@@ -54,7 +54,7 @@ export function meta({}: Route.MetaArgs) {
 }
 
 export async function loader(args: Route.LoaderArgs) {
-  const { userId } = await getAuth(args);
+  const { userId } = await getServerAuth(args.request);
 
   let user = null;
   let existingForwarder = null;

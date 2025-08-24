@@ -1,4 +1,5 @@
-import { getAuth } from "@clerk/react-router/ssr.server";
+import { getServerAuth } from "~/contexts/auth";
+import { redirect } from "react-router";
 import { fetchQuery } from "convex/nextjs";
 import { api } from "../../../convex/_generated/api";
 import { useQuery } from "convex/react";
@@ -6,10 +7,10 @@ import { useState } from "react";
 import { Package, Search, Printer, Target, Tag, Smartphone } from "lucide-react";
 
 export async function loader(args: any) {
-  const { userId } = await getAuth(args);
+  const { userId } = await getServerAuth(args.request);
   
   if (!userId) {
-    throw new Response("Unauthorized", { status: 401 });
+    return redirect("/sign-in");
   }
 
   try {

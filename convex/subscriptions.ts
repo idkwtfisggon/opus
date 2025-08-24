@@ -205,27 +205,16 @@ export const checkUserSubscriptionStatus = query({
   },
 });
 
-export const checkUserSubscriptionStatusByClerkId = query({
+export const checkUserSubscriptionStatusBySupabaseId = query({
   args: {
-    clerkUserId: v.string(),
+    supabaseUserId: v.string(),
   },
   handler: async (ctx, args) => {
-    // Find user by Clerk user ID (this assumes the tokenIdentifier contains the Clerk user ID)
-    // In Clerk, the subject is typically in the format "user_xxxxx" where xxxxx is the Clerk user ID
-    const tokenIdentifier = `user_${args.clerkUserId}`;
-
-    let user = await ctx.db
+    // Find user by Supabase user ID
+    const user = await ctx.db
       .query("users")
-      .withIndex("by_token", (q) => q.eq("tokenIdentifier", tokenIdentifier))
+      .withIndex("by_token", (q) => q.eq("tokenIdentifier", args.supabaseUserId))
       .unique();
-
-    // If not found with user_ prefix, try the raw userId
-    if (!user) {
-      user = await ctx.db
-        .query("users")
-        .withIndex("by_token", (q) => q.eq("tokenIdentifier", args.clerkUserId))
-        .unique();
-    }
 
     if (!user) {
       return { hasActiveSubscription: false };
