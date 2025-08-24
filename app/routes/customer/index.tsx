@@ -2,6 +2,9 @@ import type { Route } from "./+types/index";
 import { Package, Clock, MapPin, Truck, Bell, Heart, CreditCard, HelpCircle } from "lucide-react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
+import { getServerAuth } from "~/contexts/auth";
+import { redirect } from "react-router";
+import { fetchQuery } from "convex/nextjs";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -10,8 +13,64 @@ export function meta({}: Route.MetaArgs) {
   ];
 }
 
-export default function CustomerDashboard() {
-  const dashboardData = useQuery(api.customerDashboard.getCustomerDashboard);
+export async function loader(args: Route.LoaderArgs) {
+  const { userId } = await getServerAuth(args.request);
+  
+  if (!userId) {
+    return redirect("/sign-in");
+  }
+
+  try {
+    // Get customer dashboard data server-side
+    const dashboardData = await fetchQuery(api.customerDashboard.getCustomerDashboard, { userId });
+    
+    return { 
+      userId,
+      dashboardData: dashboardData || {
+        customer: null,
+        activeOrders: [],
+        recentOrders: [],
+        unreadNotifications: [],
+        openSupportTickets: [],
+        stats: { 
+          totalOrders: 0, 
+          pendingOrders: 0, 
+          deliveredOrders: 0,
+          activeOrdersCount: 0
+        },
+        thisMonthSpend: 0,
+        upcomingDeliveries: [],
+        addresses: [],
+        notifications: []
+      }
+    };
+  } catch (error) {
+    console.error("Error loading customer dashboard:", error);
+    return { 
+      userId,
+      dashboardData: {
+        customer: null,
+        activeOrders: [],
+        recentOrders: [],
+        unreadNotifications: [],
+        openSupportTickets: [],
+        stats: { 
+          totalOrders: 0, 
+          pendingOrders: 0, 
+          deliveredOrders: 0,
+          activeOrdersCount: 0
+        },
+        thisMonthSpend: 0,
+        upcomingDeliveries: [],
+        addresses: [],
+        notifications: []
+      }
+    };
+  }
+}
+
+export default function CustomerDashboard({ loaderData }: Route.ComponentProps) {
+  const { dashboardData } = loaderData;
 
   if (!dashboardData) {
     return (
@@ -73,9 +132,9 @@ export default function CustomerDashboard() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 mb-2">
-              Welcome back, {customer.firstName && customer.lastName 
+              Welcome back, {customer?.firstName && customer?.lastName 
                 ? `${customer.firstName} ${customer.lastName}` 
-                : customer.firstName || customer.name || "Customer"}!
+                : customer?.firstName || customer?.name || "Customer"}!
             </h1>
             <p className="text-gray-600">Track your international shipments and manage your orders</p>
           </div>

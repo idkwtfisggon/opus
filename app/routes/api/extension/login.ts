@@ -78,8 +78,17 @@ export async function action({ request }: Route.ActionArgs) {
       );
     }
 
-    // Hard-code your role since you're a forwarder
-    let userRole = 'forwarder';
+    // Get the actual role from Supabase user metadata or determine from database
+    let userRole = data.user.user_metadata?.role || 'customer';
+    
+    // For specific accounts, override with correct roles
+    if (data.user.email === 'benongyr@gmail.com') {
+      userRole = 'forwarder';
+    } else if (data.user.email === 'aredsnuff@gmail.com') {
+      userRole = 'customer';
+    } else if (data.user.email === 'benedickels@gmail.com') {
+      userRole = 'staff';
+    }
     
     return new Response(
       JSON.stringify({ 

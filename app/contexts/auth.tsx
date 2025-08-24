@@ -48,14 +48,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .then(response => response.json())
       .then(data => {
         if (data.ok) {
-          const mockSession = {
+          const sessionData = {
             access_token: storedToken,
             refresh_token: storedToken,
             expires_in: 3600,
+            expires_at: Math.floor(Date.now() / 1000) + 3600,
             token_type: 'bearer',
             user: data.user
           };
-          setSession(mockSession as any);
+          setSession(sessionData as any);
           setUser(data.user as AuthUser);
         } else {
           localStorage.removeItem('supabase_token');
@@ -142,11 +143,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
-    localStorage.removeItem('supabase_token');
-    // Clear cookie
-    document.cookie = 'supabase_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-    setUser(null);
-    setSession(null);
+    try {
+      // Sign out from Supabase
+      await supabase.auth.signOut();
+      
+      // Clear local storage and cookies
+      localStorage.removeItem('supabase_token');
+      document.cookie = 'supabase_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+      
+      // Reset state
+      setUser(null);
+      setSession(null);
+      
+      // Redirect to home or sign-in
+      window.location.href = '/';
+    } catch (error) {
+      console.error('Sign out error:', error);
+      // Still clear local state even if Supabase call fails
+      localStorage.removeItem('supabase_token');
+      document.cookie = 'supabase_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+      setUser(null);
+      setSession(null);
+      window.location.href = '/';
+    }
   };
 
   const value = {

@@ -358,3 +358,186 @@ export const cleanupTestOrders = mutation({
     };
   },
 });
+
+// Create a test order for current customer
+export const createTestOrder = mutation({
+  args: {
+    userId: v.optional(v.string())
+  },
+  handler: async (ctx, args) => {
+    console.log("createTestOrder: Starting...");
+    
+    let userId: string;
+    
+    if (args.userId) {
+      // Use provided userId
+      userId = args.userId;
+      console.log("createTestOrder: Using provided userId:", userId);
+    } else {
+      // Try to get from auth context
+      const identity = await ctx.auth.getUserIdentity();
+      console.log("createTestOrder: Got identity:", !!identity, identity?.tokenIdentifier);
+      
+      if (!identity) {
+        throw new Error("Not authenticated - no identity found and no userId provided");
+      }
+      userId = identity.tokenIdentifier;
+    }
+    
+    // Find the user
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_token", (q) => q.eq("tokenIdentifier", userId))
+      .unique();
+
+    if (!user) {
+      throw new Error(`User not found with tokenIdentifier: ${userId}`);
+    }
+
+    // Find a forwarder to assign this order to (use benongyr@gmail.com's forwarder)
+    const forwarderUser = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("email"), "benongyr@gmail.com"))
+      .first();
+    
+    if (!forwarderUser) {
+      throw new Error("Forwarder user not found");
+    }
+
+    const forwarder = await ctx.db
+      .query("forwarders")
+      .withIndex("by_user", (q) => q.eq("userId", forwarderUser.tokenIdentifier))
+      .first();
+
+    if (!forwarder) {
+      throw new Error("Forwarder not found");
+    }
+
+    // Get a warehouse for this forwarder
+    const warehouse = await ctx.db
+      .query("warehouses")
+      .withIndex("by_forwarder", (q) => q.eq("forwarderId", forwarder._id))
+      .first();
+
+    if (!warehouse) {
+      throw new Error("No warehouse found for forwarder");
+    }
+
+    const now = Date.now();
+    
+    // Generate a realistic test order
+    const merchants = ["Amazon", "eBay Store", "Shopify Shop", "AliExpress", "Etsy Shop"];
+    const categories = ["Electronics", "Clothing", "Books", "Home & Garden", "Sports"];
+    const randomMerchant = merchants[Math.floor(Math.random() * merchants.length)];
+    const randomCategory = categories[Math.floor(Math.random() * categories.length)];
+    
+    const trackingNumber = `TEST${Date.now().toString().slice(-8)}`;
+    const orderNumber = `ORD${Date.now().toString().slice(-6)}`;
+    
+    const orderId = await ctx.db.insert("orders", {
+      trackingNumber,
+      customerId: userId,
+      customerName: user.firstName && user.lastName 
+        ? `${user.firstName} ${user.lastName}` 
+        : user.name || user.email || "Test Customer",
+      customerEmail: user.email || "test@example.com",
+      shippingAddress: user.shippingAddress || "123 Test Street, Test City, Test Country",
+      merchantName: randomMerchant,
+      merchantOrderId: `${randomMerchant.toUpperCase()}-${Math.random().toString(36).substr(2, 8)}`,
+      declaredWeight: Math.round((Math.random() * 5 + 0.5) * 100) / 100, // 0.5-5.5kg
+      declaredValue: Math.round((Math.random() * 500 + 20) * 100) / 100, // $20-520
+      currency: user.preferredCurrency || "USD",
+      dimensions: `${Math.floor(Math.random() * 30 + 10)}cm x ${Math.floor(Math.random() * 20 + 10)}cm x ${Math.floor(Math.random() * 15 + 5)}cm`,
+      warehouseId: warehouse._id,
+      forwarderId: forwarder._id,
+      status: "incoming" as const,
+      courier: "Standard Shipping",
+      courierTrackingNumber: "-",
+      shippingType: "immediate" as const,
+      labelPrinted: false,
+      specialInstructions: Math.random() > 0.7 ? "Handle with care - fragile items" : undefined,
+      packageDescription: `Test ${randomCategory} item from ${randomMerchant}`,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    return {
+      success: true,
+      message: "Test order created successfully",
+      orderId,
+      trackingNumber,
+      merchantName: randomMerchant,
+      forwarderName: forwarder.businessName
+    };
+  },
+});
+
+// Delete a test order (only allows deleting orders with TEST tracking numbers)
+export const deleteTestOrder = mutation({
+  args: {
+    orderId: v.string(),
+    userId: v.optional(v.string())
+  },
+  handler: async (ctx, args) => {
+    let userId: string;
+    
+    if (args.userId) {
+      userId = args.userId;
+    } else {
+      const identity = await ctx.auth.getUserIdentity();
+      if (!identity) {
+        throw new Error("Not authenticated");
+      }
+      userId = identity.tokenIdentifier;
+    }
+    
+    // Get the order
+    const order = await ctx.db.get(args.orderId);
+    if (!order) {
+      throw new Error("Order not found");
+    }
+    
+    // Only allow deleting test orders (tracking numbers that start with TEST)
+    if (!order.trackingNumber.startsWith("TEST")) {
+      throw new Error("Can only delete test orders");
+    }
+    
+    // Only allow the customer who created the order or the forwarder to delete it
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_token", (q) => q.eq("tokenIdentifier", userId))
+      .unique();
+    
+    if (!user) {
+      throw new Error("User not found");
+    }
+    
+    const canDelete = (
+      order.customerId === userId || // Customer who created the order
+      (user.role === "forwarder" && user.email === "benongyr@gmail.com") // The test forwarder
+    );
+    
+    if (!canDelete) {
+      throw new Error("Not authorized to delete this order");
+    }
+    
+    // Delete the order
+    await ctx.db.delete(args.orderId);
+    
+    // Also delete any related records (status history, etc.)
+    const statusHistory = await ctx.db
+      .query("orderStatusHistory")
+      .withIndex("by_order", (q) => q.eq("orderId", args.orderId))
+      .collect();
+    
+    for (const record of statusHistory) {
+      await ctx.db.delete(record._id);
+    }
+    
+    return {
+      success: true,
+      message: `Test order ${order.trackingNumber} deleted successfully`,
+      deletedTrackingNumber: order.trackingNumber
+    };
+  },
+});

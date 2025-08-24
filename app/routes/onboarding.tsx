@@ -6,7 +6,7 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useSearchParams, useNavigate } from "react-router";
 import { useEffect, useState } from "react";
-import { useUser } from "@clerk/react-router";
+import { useAuth } from "~/contexts/auth";
 import { CheckCircle, Users, Package } from "lucide-react";
 
 export async function loader(args: Route.LoaderArgs) {
@@ -23,7 +23,7 @@ export async function loader(args: Route.LoaderArgs) {
 }
 
 export default function OnboardingPage() {
-  const { user } = useUser();
+  const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const role = searchParams.get("role");

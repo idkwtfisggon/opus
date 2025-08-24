@@ -3,7 +3,7 @@ import { getServerAuth } from "~/contexts/auth";
 import { redirect } from "react-router";
 import { Settings as SettingsIcon, Package, MapPin, CreditCard, Bell, Shield, Globe, Palette, Plus, Edit2, Trash2, CheckCircle, AlertCircle, Info, X, Lightbulb, Search, PenTool } from "lucide-react";
 import React, { useState } from "react";
-import { useUser } from "@clerk/react-router";
+import { useAuth } from "~/contexts/auth";
 import { useMutation, useQuery } from "convex/react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
@@ -32,7 +32,7 @@ export function meta({}: Route.MetaArgs) {
 }
 
 export default function CustomerSettings({ loaderData }: Route.ComponentProps) {
-  const { user } = useUser();
+  const { user } = useAuth();
   
   // Real-time user data
   const userProfile = useQuery(api.users.getUserProfile);

@@ -69,6 +69,8 @@ export default function ForwarderDashboard({ loaderData }: Route.ComponentProps)
   // Use server data instead of client queries
   const currentOrders = recentOrders; // Use the orders from server
   const staffMetrics = staff ? { totalStaff: staff.length } : null;
+  const staffActivity = []; // TODO: Add staff activity from server data
+  const performanceMetrics = null; // TODO: Add performance metrics from server data
   
   // Timezone fix mutation - use the existing upsertForwarder instead
   const updateForwarder = useMutation(api.forwarders.upsertForwarder);

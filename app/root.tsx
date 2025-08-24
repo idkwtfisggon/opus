@@ -13,7 +13,8 @@ import type { Route } from "./+types/root";
 import "./app.css";
 import { Analytics } from "@vercel/analytics/react";
 import { Toaster } from "sonner";
-import { AuthProvider, useAuth } from "./contexts/auth";
+import { AuthProvider } from "./contexts/auth";
+import { useConvexAuth } from "./hooks/useConvexAuth";
 
 const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL as string);
 
@@ -89,17 +90,36 @@ export function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
+function ConvexAuthWrapper({ children }: { children: React.ReactNode }) {
+  const auth = useConvexAuth();
+  
+  return (
+    <ConvexProviderWithAuth 
+      client={convex}
+      useAuth={() => auth}
+    >
+      {children}
+    </ConvexProviderWithAuth>
+  );
+}
+
+function AppContent() {
+  return (
+    <ConvexAuthWrapper>
+      <Outlet />
+      <Toaster 
+        position="top-right"
+        richColors
+        closeButton
+      />
+    </ConvexAuthWrapper>
+  );
+}
+
 export default function App() {
   return (
     <AuthProvider>
-      <ConvexProvider client={convex}>
-        <Outlet />
-        <Toaster 
-          position="top-right"
-          richColors
-          closeButton
-        />
-      </ConvexProvider>
+      <AppContent />
     </AuthProvider>
   );
 }

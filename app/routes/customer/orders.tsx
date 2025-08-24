@@ -1,9 +1,9 @@
 import type { Route } from "./+types/orders";
-import { Package, Search, Filter, Eye } from "lucide-react";
+import { Package, Search, Filter, Eye, CheckCircle, X, Trash2 } from "lucide-react";
 import React, { useState } from "react";
 import { getServerAuth } from "~/contexts/auth";
 import { redirect } from "react-router";
-import { useQuery } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 
 export function meta({}: Route.MetaArgs) {
@@ -27,14 +27,25 @@ export default function CustomerOrders({ loaderData }: Route.ComponentProps) {
   const { userId } = loaderData;
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [isCreatingTestOrder, setIsCreatingTestOrder] = useState(false);
+  const [notification, setNotification] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({
+    show: false,
+    message: '',
+    type: 'success'
+  });
 
   // Get real orders from Convex (authentication handled in Convex function)
   const ordersData = useQuery(api.orders.getCustomerOrders, {
+    customerId: userId,
     limit: 50,
     offset: 0
   });
   const orders = ordersData?.orders || [];
   const isLoading = ordersData === undefined;
+
+  // Test order creation mutation
+  const createTestOrder = useMutation(api.seedTestData.createTestOrder);
+  const deleteTestOrder = useMutation(api.seedTestData.deleteTestOrder);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -83,6 +94,39 @@ export default function CustomerOrders({ loaderData }: Route.ComponentProps) {
     return order.trackingNumber;
   };
 
+  const showNotification = (message: string, type: 'success' | 'error' = 'success') => {
+    setNotification({ show: true, message, type });
+    setTimeout(() => setNotification({ show: false, message: '', type: 'success' }), 4000);
+  };
+
+  const handleCreateTestOrder = async () => {
+    setIsCreatingTestOrder(true);
+    try {
+      const result = await createTestOrder({ userId });
+      // Orders will automatically refresh due to Convex reactivity
+      showNotification(`Test order created! Tracking: ${result.trackingNumber} from ${result.merchantName}`);
+    } catch (error: any) {
+      console.error("Failed to create test order:", error);
+      showNotification(`Failed to create test order: ${error.message}`, 'error');
+    } finally {
+      setIsCreatingTestOrder(false);
+    }
+  };
+
+  const handleDeleteTestOrder = async (orderId: string, trackingNumber: string) => {
+    if (!confirm(`Are you sure you want to delete test order ${trackingNumber}?`)) {
+      return;
+    }
+
+    try {
+      const result = await deleteTestOrder({ orderId, userId });
+      showNotification(`Test order deleted: ${result.deletedTrackingNumber}`);
+    } catch (error: any) {
+      console.error("Failed to delete test order:", error);
+      showNotification(`Failed to delete test order: ${error.message}`, 'error');
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
       {/* Page Header */}
@@ -92,13 +136,23 @@ export default function CustomerOrders({ loaderData }: Route.ComponentProps) {
             <h1 className="text-2xl font-bold text-gray-900 mb-2">My Orders</h1>
             <p className="text-gray-600">Track and manage all your international shipments</p>
           </div>
-          <a 
-            href="/customer/create-order"
-            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors flex items-center gap-2"
-          >
-            <Package className="h-5 w-5" />
-            Create New Order
-          </a>
+          <div className="flex gap-3">
+            <button 
+              onClick={handleCreateTestOrder}
+              disabled={isCreatingTestOrder}
+              className="bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white px-6 py-3 rounded-lg font-medium transition-colors flex items-center gap-2"
+            >
+              <Package className="h-5 w-5" />
+              {isCreatingTestOrder ? "Creating..." : "Create Test Order"}
+            </button>
+            <a 
+              href="/customer/create-order"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors flex items-center gap-2"
+            >
+              <Package className="h-5 w-5" />
+              Create New Order
+            </a>
+          </div>
         </div>
       </div>
 
@@ -258,10 +312,23 @@ export default function CustomerOrders({ loaderData }: Route.ComponentProps) {
                         )}
                       </div>
                       
-                      <button className="inline-flex items-center px-3 py-1 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
-                        <Eye className="w-4 h-4 mr-1" />
-                        Track Order
-                      </button>
+                      <div className="flex gap-2">
+                        <button className="inline-flex items-center px-3 py-1 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+                          <Eye className="w-4 h-4 mr-1" />
+                          Track Order
+                        </button>
+                        
+                        {/* Delete button for test orders only */}
+                        {order.trackingNumber.startsWith("TEST") && (
+                          <button 
+                            onClick={() => handleDeleteTestOrder(order._id, order.trackingNumber)}
+                            className="inline-flex items-center px-3 py-1 border border-red-300 rounded-md text-sm font-medium text-red-700 bg-white hover:bg-red-50 transition-colors"
+                            title="Delete Test Order"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -270,6 +337,26 @@ export default function CustomerOrders({ loaderData }: Route.ComponentProps) {
           </div>
         </div>
       </div>
+
+      {/* Notification Toast */}
+      {notification.show && (
+        <div className="fixed top-4 right-4 z-50">
+          <div className={`p-4 rounded-lg shadow-lg max-w-sm ${
+            notification.type === 'error' 
+              ? 'bg-red-50 border border-red-200 text-red-800' 
+              : 'bg-green-50 border border-green-200 text-green-800'
+          }`}>
+            <div className="flex items-center gap-2">
+              {notification.type === 'error' ? (
+                <X className="w-5 h-5 text-red-600" />
+              ) : (
+                <CheckCircle className="w-5 h-5 text-green-600" />
+              )}
+              <p className="text-sm font-medium">{notification.message}</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

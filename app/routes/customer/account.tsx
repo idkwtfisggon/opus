@@ -2,7 +2,7 @@ import { getServerAuth } from "~/contexts/auth";
 import { fetchQuery } from "convex/nextjs";
 import { redirect } from "react-router";
 import type { Route } from "./+types/account";
-import { useUser } from "@clerk/react-router";
+import { useAuth } from "~/contexts/auth";
 import { useState } from "react";
 import * as React from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
@@ -28,7 +28,7 @@ export async function loader(args: Route.LoaderArgs) {
 }
 
 export default function CustomerAccountSettings({ loaderData }: Route.ComponentProps) {
-  const { user } = useUser();
+  const { user } = useAuth();
   
   // Real-time user data
   const userProfile = useQuery(api.users.getUserProfile);
@@ -113,10 +113,10 @@ export default function CustomerAccountSettings({ loaderData }: Route.ComponentP
   React.useEffect(() => {
     if (userProfile || user) {
       setFormData({
-        firstName: userProfile?.firstName || user?.firstName || "",
-        lastName: userProfile?.lastName || user?.lastName || "",
-        email: userProfile?.email || user?.emailAddresses?.[0]?.emailAddress || "",
-        phoneNumber: userProfile?.phoneNumber || user?.phoneNumbers?.[0]?.phoneNumber || "",
+        firstName: userProfile?.firstName || user?.user_metadata?.first_name || "",
+        lastName: userProfile?.lastName || user?.user_metadata?.last_name || "",
+        email: userProfile?.email || user?.email || "",
+        phoneNumber: userProfile?.phoneNumber || user?.phone || "",
         country: userProfile?.country || "",
         language: userProfile?.language || "en",
         currentPassword: "",
@@ -219,10 +219,9 @@ export default function CustomerAccountSettings({ loaderData }: Route.ComponentP
     
     setIsLoading(true);
     try {
-      await user?.updatePassword({
-        newPassword: formData.newPassword,
-        currentPassword: formData.currentPassword,
-      });
+      // TODO: Implement Supabase password change
+      // For now, show message that this needs to be implemented
+      showNotification("Password change feature will be implemented with Supabase auth update API", 'error');
       
       // Clear password fields
       setFormData(prev => ({
@@ -232,15 +231,9 @@ export default function CustomerAccountSettings({ loaderData }: Route.ComponentP
         confirmPassword: ""
       }));
       
-      showNotification("Password updated successfully!");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating password:", error);
-      
-      if (error.message?.includes("additional verification")) {
-        showNotification("For security reasons, please sign out and sign back in, then try changing your password again.", 'error');
-      } else {
-        showNotification(`Failed to update password: ${error.errors?.[0]?.message || error.message || error}`, 'error');
-      }
+      showNotification(`Failed to update password: ${error.message || error}`, 'error');
     } finally {
       setIsLoading(false);
     }
@@ -497,7 +490,7 @@ export default function CustomerAccountSettings({ loaderData }: Route.ComponentP
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">Member Since</span>
                   <span className="text-sm text-muted-foreground">
-                    {user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : "N/A"}
+                    {user?.created_at ? new Date(user.created_at).toLocaleDateString() : "N/A"}
                   </span>
                 </div>
               </div>
