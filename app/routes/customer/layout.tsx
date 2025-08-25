@@ -64,8 +64,9 @@ export async function loader(args: Route.LoaderArgs) {
   }
 }
 
-export default function CustomerLayout() {
+export default function CustomerLayout({ loaderData }: Route.ComponentProps) {
   const { signOut } = useAuth();
+  const { user } = loaderData;
 
   const handleSignOut = async () => {
     try {
@@ -153,7 +154,7 @@ export default function CustomerLayout() {
       
       {/* Main Content */}
       <div className="flex-1 overflow-y-auto">
-        <Outlet />
+        <Outlet context={{ user }} />
       </div>
     </div>
   );

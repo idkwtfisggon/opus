@@ -127,6 +127,63 @@ export const updateForwardingEmail = mutation({
 });
 
 // Process incoming email (called by webhook)
+// Classify email type based on subject and content
+function classifyEmailType(subject: string, body: string, from: string): string {
+  const subjectLower = subject.toLowerCase();
+  const bodyLower = body.toLowerCase();
+  
+  // Order confirmation patterns
+  const confirmationPatterns = [
+    'order confirmation', 'purchase confirmation', 'receipt', 'thank you for your order',
+    'order placed', 'payment received', 'order received', 'your order is confirmed'
+  ];
+  
+  // Shipping notification patterns
+  const shippingPatterns = [
+    'shipped', 'on its way', 'dispatched', 'sent out', 'your order has been shipped',
+    'item shipped', 'package shipped', 'shipment notification', 'has shipped'
+  ];
+  
+  // Tracking update patterns
+  const trackingPatterns = [
+    'tracking update', 'package update', 'shipment update', 'delivery update',
+    'in transit', 'out for delivery', 'arrived at facility'
+  ];
+  
+  // Delivery confirmation patterns
+  const deliveryPatterns = [
+    'delivered', 'package delivered', 'delivery confirmation', 'successfully delivered',
+    'arrived', 'completed delivery'
+  ];
+  
+  // Check for delivery first (most specific)
+  if (deliveryPatterns.some(pattern => subjectLower.includes(pattern) || bodyLower.includes(pattern))) {
+    return "delivery_confirmation";
+  }
+  
+  // Check for shipping notification
+  if (shippingPatterns.some(pattern => subjectLower.includes(pattern))) {
+    return "shipping_notification";
+  }
+  
+  // Check for tracking updates
+  if (trackingPatterns.some(pattern => subjectLower.includes(pattern))) {
+    return "tracking_update";
+  }
+  
+  // Check for order confirmation
+  if (confirmationPatterns.some(pattern => subjectLower.includes(pattern))) {
+    return "order_confirmation";
+  }
+  
+  // If it has tracking numbers but unclear type, assume shipping notification
+  if (bodyLower.includes('tracking') && (bodyLower.includes('number') || bodyLower.includes('track'))) {
+    return "shipping_notification";
+  }
+  
+  return "unknown";
+}
+
 export const processIncomingEmail = mutation({
   args: {
     from: v.string(),
@@ -148,6 +205,14 @@ export const processIncomingEmail = mutation({
       weight: v.optional(v.number()),
     }),
     isShippingEmail: v.boolean(),
+    emailType: v.union(
+      v.literal("order_confirmation"), 
+      v.literal("shipping_notification"), 
+      v.literal("tracking_update"),
+      v.literal("delivery_confirmation"),
+      v.literal("spam"),
+      v.literal("unknown")
+    ),
     confidence: v.number(),
     spamScore: v.number(),
     spamReasons: v.array(v.string()),
@@ -166,6 +231,9 @@ export const processIncomingEmail = mutation({
 
     const customerId = customerEmail.customerId;
 
+    // Classify email type
+    const emailType = classifyEmailType(args.subject, args.body, args.from);
+
     // Create email message record
     const emailId = await ctx.db.insert("emailMessages", {
       customerId,
@@ -176,6 +244,7 @@ export const processIncomingEmail = mutation({
       body: args.body,
       attachments: args.attachments,
       isShippingEmail: args.isShippingEmail,
+      emailType: emailType,
       confidence: args.confidence,
       extractedData: args.extractedData,
       isProcessed: true,
@@ -193,17 +262,165 @@ export const processIncomingEmail = mutation({
       totalEmailsReceived: customerEmail.totalEmailsReceived + 1,
     });
 
-    // Try to match with existing orders if this is a shipping email
-    if (args.isShippingEmail && args.extractedData.trackingNumbers.length > 0) {
-      await matchEmailToOrder(ctx, emailId, customerId, args.extractedData);
+    // Handle email based on its type
+    if (args.isShippingEmail) {
+      await handleShippingEmail(ctx, emailId, customerId, args);
     }
 
     return emailId;
   },
 });
 
+// Smart email classification and handling
+async function handleShippingEmail(ctx: any, emailId: any, customerId: string, emailData: any) {
+  const { emailType, extractedData } = emailData;
+  
+  switch (emailType) {
+    case "order_confirmation":
+      // Only create order if none exists for this shop/order number
+      await handleOrderConfirmation(ctx, emailId, customerId, extractedData, emailData);
+      break;
+      
+    case "shipping_notification":
+      // Update existing order or create if missing
+      await handleShippingNotification(ctx, emailId, customerId, extractedData, emailData);
+      break;
+      
+    case "tracking_update":
+      // Just update existing order with tracking info
+      await handleTrackingUpdate(ctx, emailId, customerId, extractedData);
+      break;
+      
+    case "delivery_confirmation":
+      // Update order status to delivered
+      await handleDeliveryConfirmation(ctx, emailId, customerId, extractedData);
+      break;
+      
+    default:
+      // Unknown shipping email - try basic matching
+      const matched = await matchEmailToOrder(ctx, emailId, customerId, extractedData);
+      if (!matched && extractedData.shopName && extractedData.trackingNumbers.length > 0) {
+        await createOrderFromEmail(ctx, emailId, customerId, extractedData, emailData);
+      }
+  }
+}
+
+// Handle order confirmation emails (receipt, purchase confirmation)
+async function handleOrderConfirmation(ctx: any, emailId: any, customerId: string, extractedData: any, emailData: any) {
+  // Check if order already exists for this shop + order number combination
+  const existingOrder = await findExistingOrder(ctx, customerId, extractedData);
+  
+  if (!existingOrder) {
+    // Create new order in "confirmed" status
+    const orderId = await createOrderFromEmail(ctx, emailId, customerId, extractedData, emailData, "confirmed");
+    console.log(`Created order ${orderId} from order confirmation email`);
+  } else {
+    // Just link the confirmation email to existing order
+    await ctx.db.patch(emailId, { matchedOrderId: existingOrder._id });
+    console.log(`Linked confirmation email to existing order ${existingOrder._id}`);
+  }
+}
+
+// Handle shipping notification emails (item has shipped)
+async function handleShippingNotification(ctx: any, emailId: any, customerId: string, extractedData: any, emailData: any) {
+  const existingOrder = await findExistingOrder(ctx, customerId, extractedData);
+  
+  if (existingOrder) {
+    // Update existing order with shipping info
+    await ctx.db.patch(existingOrder._id, {
+      status: "shipped",
+      shippedAt: Date.now(),
+      courierTrackingNumber: extractedData.trackingNumbers[0] || existingOrder.courierTrackingNumber,
+      updatedAt: Date.now(),
+    });
+    
+    await ctx.db.patch(emailId, { matchedOrderId: existingOrder._id });
+    console.log(`Updated order ${existingOrder._id} to shipped status`);
+  } else {
+    // Create new order if somehow missing
+    const orderId = await createOrderFromEmail(ctx, emailId, customerId, extractedData, emailData, "shipped");
+    console.log(`Created missing order ${orderId} from shipping notification`);
+  }
+}
+
+// Handle tracking update emails
+async function handleTrackingUpdate(ctx: any, emailId: any, customerId: string, extractedData: any) {
+  const existingOrder = await findExistingOrder(ctx, customerId, extractedData);
+  
+  if (existingOrder) {
+    await ctx.db.patch(existingOrder._id, {
+      courierTrackingNumber: extractedData.trackingNumbers[0] || existingOrder.courierTrackingNumber,
+      updatedAt: Date.now(),
+    });
+    
+    await ctx.db.patch(emailId, { matchedOrderId: existingOrder._id });
+    console.log(`Updated tracking for order ${existingOrder._id}`);
+  }
+}
+
+// Handle delivery confirmation emails
+async function handleDeliveryConfirmation(ctx: any, emailId: any, customerId: string, extractedData: any) {
+  const existingOrder = await findExistingOrder(ctx, customerId, extractedData);
+  
+  if (existingOrder) {
+    await ctx.db.patch(existingOrder._id, {
+      status: "delivered",
+      deliveredAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+    
+    await ctx.db.patch(emailId, { matchedOrderId: existingOrder._id });
+    console.log(`Marked order ${existingOrder._id} as delivered`);
+  }
+}
+
+// Find existing order by multiple criteria
+async function findExistingOrder(ctx: any, customerId: string, extractedData: any) {
+  const customerOrders = await ctx.db
+    .query("orders")
+    .filter((q: any) => q.eq(q.field("customerId"), customerId))
+    .collect();
+
+  // Try matching by order number first (most reliable)
+  if (extractedData.orderNumbers && extractedData.orderNumbers.length > 0) {
+    for (const orderNum of extractedData.orderNumbers) {
+      const orderMatch = customerOrders.find((order: any) => 
+        order.merchantOrderId === orderNum || 
+        order.trackingNumber === orderNum ||
+        order.orderNumber?.includes(orderNum)
+      );
+      if (orderMatch) return orderMatch;
+    }
+  }
+
+  // Try matching by tracking number
+  if (extractedData.trackingNumbers && extractedData.trackingNumbers.length > 0) {
+    for (const trackingNum of extractedData.trackingNumbers) {
+      const trackingMatch = customerOrders.find((order: any) => 
+        order.trackingNumber === trackingNum ||
+        order.courierTrackingNumber === trackingNum
+      );
+      if (trackingMatch) return trackingMatch;
+    }
+  }
+
+  // Try matching by shop name + recent orders (last 30 days)
+  if (extractedData.shopName) {
+    const recentOrders = customerOrders.filter((order: any) => 
+      order.merchantName?.toLowerCase().includes(extractedData.shopName.toLowerCase()) &&
+      (Date.now() - order.createdAt) < (30 * 24 * 60 * 60 * 1000) // 30 days
+    );
+    
+    if (recentOrders.length === 1) {
+      return recentOrders[0];
+    }
+  }
+
+  return null;
+}
+
 // Helper function to match email to existing orders
-async function matchEmailToOrder(ctx: any, emailId: any, customerId: string, extractedData: any) {
+async function matchEmailToOrder(ctx: any, emailId: any, customerId: string, extractedData: any): Promise<boolean> {
   // Get customer's pending orders
   const customerOrders = await ctx.db
     .query("orders")
@@ -234,7 +451,7 @@ async function matchEmailToOrder(ctx: any, emailId: any, customerId: string, ext
         courierTrackingNumber: trackingNumber,
       });
       
-      return;
+      return true;
     }
   }
 
@@ -258,8 +475,90 @@ async function matchEmailToOrder(ctx: any, emailId: any, customerId: string, ext
       await ctx.db.patch(emailId, {
         matchedOrderId: similarOrders[0]._id,
       });
+      return true;
     }
   }
+  
+  return false;
+}
+
+// Helper function to create order from email data
+async function createOrderFromEmail(ctx: any, emailId: any, customerId: string, extractedData: any, emailData: any, orderStatus: string = "incoming") {
+  // Get customer info for shipping address
+  const customer = await ctx.db
+    .query("users")
+    .filter((q: any) => q.eq(q.field("tokenIdentifier"), customerId))
+    .first();
+    
+  if (!customer) {
+    console.error("Customer not found for order creation");
+    return;
+  }
+
+  // Get customer's preferred forwarder (or use default)
+  const forwarder = await ctx.db
+    .query("forwarders")
+    .first(); // For now, use first available forwarder
+    
+  if (!forwarder) {
+    console.error("No forwarder available for order creation");
+    return;
+  }
+
+  // Get forwarder's warehouse
+  const warehouse = await ctx.db
+    .query("warehouses")
+    .filter((q: any) => q.eq(q.field("forwarderId"), forwarder._id))
+    .first();
+
+  // Get customer's email address for the order
+  const customerEmailRecord = await ctx.db
+    .query("customerEmailAddresses")
+    .filter((q: any) => q.eq(q.field("customerId"), customerId))
+    .first();
+
+  // Create order from email data
+  const orderId = await ctx.db.insert("orders", {
+    customerId: customerId,
+    forwarderId: forwarder._id,
+    warehouseId: warehouse?._id || forwarder._id,
+    
+    // Required customer info
+    customerName: customer.name || `${customer.firstName || ''} ${customer.lastName || ''}`.trim() || "Customer",
+    customerEmail: customerEmailRecord?.emailAddress || customer.email || "",
+    customerPhone: customer.phoneNumber,
+    
+    // Order details from email
+    merchantName: extractedData.shopName,
+    trackingNumber: extractedData.trackingNumbers[0],
+    courierTrackingNumber: extractedData.trackingNumbers[0],
+    
+    // Estimated values from email (if available)
+    declaredValue: extractedData.estimatedValue || 50, // Default value
+    declaredWeight: extractedData.weight || 1, // Default weight
+    currency: extractedData.currency || "USD",
+    
+    // Shipping info
+    shippingAddress: customer.shippingAddress || "",
+    
+    // Status
+    status: orderStatus,
+    shippingType: "immediate",
+    courier: "Email Auto-Created",
+    
+    // Required fields
+    labelPrinted: false,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  });
+
+  // Link the email to the new order
+  await ctx.db.patch(emailId, {
+    matchedOrderId: orderId,
+  });
+
+  console.log(`Auto-created order ${orderId} from email for customer ${customerId}`);
+  return orderId;
 }
 
 // Forward email to customer's real email
@@ -399,6 +698,36 @@ export const getEmailStats = query({
       matchedEmails: matchedEmails.length,
       totalReceived: customerEmail.totalEmailsReceived,
       totalForwarded: customerEmail.totalEmailsForwarded,
+    };
+  },
+});
+
+// Retroactively create orders from existing emails that don't have matched orders
+export const createOrdersFromUnmatchedEmails = mutation({
+  args: { customerId: v.string() },
+  handler: async (ctx, { customerId }) => {
+    // Get all shipping emails without matched orders
+    const unmatchedEmails = await ctx.db
+      .query("emailMessages")
+      .filter((q) => q.eq(q.field("customerId"), customerId))
+      .filter((q) => q.eq(q.field("isShippingEmail"), true))
+      .filter((q) => q.eq(q.field("matchedOrderId"), undefined))
+      .collect();
+
+    const createdOrders = [];
+
+    for (const email of unmatchedEmails) {
+      if (email.extractedData.shopName && email.extractedData.trackingNumbers.length > 0) {
+        const orderId = await createOrderFromEmail(ctx, email._id, customerId, email.extractedData, email);
+        if (orderId) {
+          createdOrders.push(orderId);
+        }
+      }
+    }
+
+    return { 
+      createdCount: createdOrders.length,
+      orderIds: createdOrders
     };
   },
 });

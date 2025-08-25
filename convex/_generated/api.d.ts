@@ -26,6 +26,7 @@ import type * as forwarderSettings from "../forwarderSettings.js";
 import type * as forwarderShipping from "../forwarderShipping.js";
 import type * as forwarders from "../forwarders.js";
 import type * as http from "../http.js";
+import type * as linkExistingEmail from "../linkExistingEmail.js";
 import type * as migrate from "../migrate.js";
 import type * as orderStatusHistory from "../orderStatusHistory.js";
 import type * as orders from "../orders.js";
@@ -63,6 +64,7 @@ declare const fullApi: ApiFromModules<{
   forwarderShipping: typeof forwarderShipping;
   forwarders: typeof forwarders;
   http: typeof http;
+  linkExistingEmail: typeof linkExistingEmail;
   migrate: typeof migrate;
   orderStatusHistory: typeof orderStatusHistory;
   orders: typeof orders;

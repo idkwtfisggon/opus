@@ -4,6 +4,7 @@ import { useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { XCircle, Package, Truck, Mail, ShoppingBag, Lightbulb, Settings } from "lucide-react";
 import EmailManager from "../../../components/customer/EmailManager";
+import { useOutletContext } from "react-router";
 
 export function meta() {
   return [
@@ -13,34 +14,32 @@ export function meta() {
 }
 
 export async function loader(args: Route.LoaderArgs) {
-  // Temporarily bypass auth and Convex
-  return { 
-    customer: { 
-      _id: 'temp-id',
-      email: 'benongyr@gmail.com', 
-      forwardingAddress: 'test@example.com' 
-    } 
-  };
+  return {};
 }
 
 export default function CustomerMail({ loaderData }: Route.ComponentProps) {
-  const { customer } = loaderData;
+  const { user: customer } = useOutletContext<{ user: any }>();
   const [selectedEmailId, setSelectedEmailId] = useState<string | null>(null);
   const [showEmailSettings, setShowEmailSettings] = useState(false);
 
+  console.log("Customer mail page - customer:", customer);
+
   // Get customer's emails with fallback
   const allEmails = useQuery(api.emails.getCustomerEmails, { 
-    customerId: customer._id,
+    customerId: customer.tokenIdentifier,
     limit: 50 
   }) || [];
   
   // Get email statistics with fallback
-  const emailStats = useQuery(api.emails.getEmailStats, { customerId: customer._id }) || {
+  const emailStats = useQuery(api.emails.getEmailStats, { customerId: customer.tokenIdentifier }) || {
     totalEmails: 0,
     shippingEmails: 0,
     matchedEmails: 0,
     spamEmails: 0
   };
+
+  // Get customer's generated email address
+  const customerEmail = useQuery(api.emails.getCustomerEmail, { customerId: customer.tokenIdentifier });
 
   const selectedEmail = null;
 
@@ -127,7 +126,7 @@ export default function CustomerMail({ loaderData }: Route.ComponentProps) {
                   <div className="flex items-center gap-2">
                     <input
                       type="email"
-                      value="your-shopping@opus1.com"
+                      value={customerEmail?.emailAddress || "Loading..."}
                       readOnly
                       className="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
                     />
@@ -183,13 +182,56 @@ export default function CustomerMail({ loaderData }: Route.ComponentProps) {
               </div>
               
               <div className="max-h-96 overflow-y-auto">
-                <div className="p-8 text-center text-gray-500">
-                  <div className="text-4xl mb-4">📭</div>
-                  <p>No emails yet</p>
-                  <p className="text-sm mt-2">
-                    Shipping confirmations will appear here when you shop online
-                  </p>
-                </div>
+                {allEmails.length === 0 ? (
+                  <div className="p-8 text-center text-gray-500">
+                    <div className="text-4xl mb-4">📭</div>
+                    <p>No emails yet</p>
+                    <p className="text-sm mt-2">
+                      Shipping confirmations will appear here when you shop online
+                    </p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-gray-200">
+                    {allEmails.map((email) => (
+                      <div
+                        key={email._id}
+                        className={`p-4 cursor-pointer hover:bg-gray-50 ${
+                          selectedEmailId === email._id ? 'bg-blue-50 border-r-4 border-blue-500' : ''
+                        }`}
+                        onClick={() => setSelectedEmailId(email._id)}
+                      >
+                        <div className="flex items-start gap-3">
+                          {getEmailIcon(email)}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <p className="text-sm font-medium text-gray-900 truncate">
+                                {email.extractedData.shopName || email.from}
+                              </p>
+                              <span className="text-xs text-gray-500">
+                                {formatDate(email.receivedAt)}
+                              </span>
+                            </div>
+                            <p className="text-sm text-gray-600 truncate mb-1">
+                              {email.subject}
+                            </p>
+                            {email.extractedData.trackingNumbers.length > 0 && (
+                              <div className="flex flex-wrap gap-1">
+                                {email.extractedData.trackingNumbers.slice(0, 2).map((tracking, idx) => (
+                                  <span
+                                    key={idx}
+                                    className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                                  >
+                                    {tracking}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>
